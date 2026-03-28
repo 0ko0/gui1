@@ -2001,31 +2001,27 @@ local function createList(option, parent, holder)
 		
 		table.insert(items, {name = tostring(value), instance = btn, textLabel = itemText, check = checkIcon, line = accentLine})
 		
-		btn.InputBegan:connect(function(input)
-			if input.UserInputType == ui or input.UserInputType == Enum.UserInputType.Touch then
-				if self.multiselect then
-					local index = table.find(self.value, tostring(value))
-					if index then
-						
-						if not self.allowNull and #self.value <= 1 then
-							shakeUI(btn) createItemRipple(btn, Color3.fromRGB(255, 50, 50)) return
-						end
-						table.remove(self.value, index)
-					else
-				
-						if #self.value >= self.maxSelect then
-							shakeUI(btn) createItemRipple(btn, Color3.fromRGB(255, 50, 50)) return
-						end
-						table.insert(self.value, tostring(value))
+		btn.Activated:Connect(function()
+			if self.multiselect then
+				local index = table.find(self.value, tostring(value))
+				if index then
+					if not self.allowNull and #self.value <= 1 then
+						shakeUI(btn) createItemRipple(btn, Color3.fromRGB(255, 50, 50)) return
 					end
-					createItemRipple(btn, ACCENT_COLOR)
-					self:SetValue(self.value)
+					table.remove(self.value, index)
 				else
-					if not self.allowNull and self.value == tostring(value) then return end
-					createItemRipple(btn, ACCENT_COLOR)
-					self:SetValue(value)
-					self:Close()
+					if #self.value >= self.maxSelect then
+						shakeUI(btn) createItemRipple(btn, Color3.fromRGB(255, 50, 50)) return
+					end
+					table.insert(self.value, tostring(value))
 				end
+				createItemRipple(btn, ACCENT_COLOR)
+				self:SetValue(self.value)
+			else
+				if not self.allowNull and self.value == tostring(value) then return end
+				createItemRipple(btn, ACCENT_COLOR)
+				self:SetValue(value)
+				self:Close()
 			end
 		end)
 		
