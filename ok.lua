@@ -3826,6 +3826,92 @@ function library:Notify(options)
 	end)
 end
 
+function library:SetToggle(keybind)
+	local toggleKey = typeof(keybind) == "EnumItem" and keybind or Enum.KeyCode.RightControl
+
+	inputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == toggleKey then
+			library:Close()
+		end
+	end)
+
+	if inputService.TouchEnabled then
+		local toggleGui = Instance.new("ScreenGui")
+		toggleGui.Name = "mobile"
+		toggleGui.ResetOnSpawn = false
+		toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+		pcall(function()
+			local CoreGui = game:GetService("CoreGui")
+			if gethui then
+				toggleGui.Parent = gethui()
+			elseif CoreGui:FindFirstChild("RobloxGui") then
+				toggleGui.Parent = CoreGui.RobloxGui
+			else
+				toggleGui.Parent = CoreGui
+			end
+		end)
+
+		local toggleBtn = Instance.new("ImageButton")
+		toggleBtn.Name = "ToggleBtn"
+		toggleBtn.Position = UDim2.new(0.5, -25, 0, 10)
+		toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+		toggleBtn.Image = "rbxassetid://6031094667" 
+		toggleBtn.ImageColor3 = Color3.fromRGB(110, 150, 255)
+		toggleBtn.Parent = toggleGui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0) 
+		corner.Parent = toggleBtn
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Color3.fromRGB(110, 150, 255)
+		stroke.Thickness = 2
+		stroke.Parent = toggleBtn
+		
+		local dragging = false
+		local dragStart = nil
+		local startPos = nil
+		local isClick = true
+
+		toggleBtn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = true
+				isClick = true
+				dragStart = input.Position
+				startPos = toggleBtn.Position
+			end
+		end)
+
+		toggleBtn.InputChanged:Connect(function(input)
+			if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+				local delta = input.Position - dragStart
+				if delta.Magnitude > 5 then 
+					isClick = false 
+					toggleBtn.Position = UDim2.new(
+						startPos.X.Scale, startPos.X.Offset + delta.X,
+						startPos.Y.Scale, startPos.Y.Offset + delta.Y
+					)
+				end
+			end
+		end)
+
+		toggleBtn.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = false
+				if isClick then
+					library:Close() 
+										
+					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 40, 0, 40)}):Play()
+					task.wait(0.1)
+					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 45, 0, 45)}):Play()
+				end
+			end
+		end)
+	end
+end
+
 wait(1)
 local VirtualUser=game:service'VirtualUser'
 game:service('Players').LocalPlayer.Idled:connect(function()
