@@ -1,4 +1,4 @@
-local library = {flags = {}, windows = {}, open = true}
+local library = {flags = {}, windows = {}, open = true, Registry = {}}
 
 --Services
 local runService = game:GetService"RunService"
@@ -2969,6 +2969,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.state
+		library.Registry[option.flag] = option
 		table.insert(self.options, option)
 		
 		return option
@@ -3003,6 +3004,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.key
+		library.Registry[option.flag] = option
 		
 		table.insert(self.options, option)
 		return option
@@ -3022,6 +3024,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.value
+		library.Registry[option.flag] = option
 		table.insert(self.options, option)
 		
 		return option
@@ -3046,6 +3049,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.value
+		library.Registry[option.flag] = option
 		table.insert(self.options, option)
 		
 		return option
@@ -3068,6 +3072,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.value
+		library.Registry[option.flag] = option
 		table.insert(self.options, option)
 		
 		return option
@@ -3084,6 +3089,7 @@ function parent:AddDivider(option)
 		option.position = #self.options
 		option.flag = option.flag or option.text
 		library.flags[option.flag] = option.color
+		library.Registry[option.flag] = option
 		table.insert(self.options, option)
 		
 		return option
@@ -3949,6 +3955,198 @@ function library:ToggleUI(keybind)
 			end
 		end)
 	end
+end
+
+--------------------------------------------------------------------------------
+-- HỆ THỐNG CONFIG MANAGER (TỐI TÂN NHẤT)
+--------------------------------------------------------------------------------
+library.ConfigManager = {
+	Folder = "SkibidiHub", -- Đổi tên thư mục mặc định của Hub bạn ở đây
+	Extension = ".json",
+	AutoSaveInterval = 10,
+	IsAutoSaving = false
+}
+
+local HttpService = game:GetService("HttpService")
+
+-- Đảm bảo thư mục tồn tại
+function library.ConfigManager:InitFolder()
+	if not isfolder then return end
+	if not isfolder(self.Folder) then
+		makefolder(self.Folder)
+	end
+	if not isfolder(self.Folder .. "/Configs") then
+		makefolder(self.Folder .. "/Configs")
+	end
+end
+
+-- Xử lý mã hóa Dữ liệu (Bao gồm cả Color3)
+local function EncodeData()
+	local savedData = {}
+	for flag, element in pairs(library.Registry) do
+		local value = library.flags[flag]
+		if typeof(value) == "Color3" then
+			savedData[flag] = {Type = "Color3", R = value.R, G = value.G, B = value.B, Alpha = element.transparency or 0}
+		elseif typeof(value) == "table" then
+			savedData[flag] = value -- Dropdown multiselect
+		elseif typeof(value) ~= "function" and typeof(value) ~= "Instance" and typeof(value) ~= "userdata" then
+			savedData[flag] = value
+		end
+	end
+	return HttpService:JSONEncode(savedData)
+end
+
+-- Lưu Config
+function library.ConfigManager:Save(fileName)
+	if not writefile then return library:Notify({Title = "Lỗi", Content = "Executor của bạn không hỗ trợ lưu file!", Type = "error"}) end
+	self:InitFolder()
+	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
+	local success, err = pcall(function()
+		writefile(path, EncodeData())
+	end)
+	if success then
+		library:Notify({Title = "Thành công", Content = "Đã lưu cấu hình: " .. fileName, Type = "success", Duration = 3})
+	else
+		library:Notify({Title = "Lỗi", Content = "Không thể lưu cấu hình: " .. tostring(err), Type = "error"})
+	end
+end
+
+-- Tải Config
+function library.ConfigManager:Load(fileName)
+	if not readfile then return end
+	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
+	if isfile(path) then
+		local success, decoded = pcall(function()
+			return HttpService:JSONDecode(readfile(path))
+		end)
+		
+		if success and type(decoded) == "table" then
+			for flag, value in pairs(decoded) do
+				local element = library.Registry[flag]
+				if element then
+					if type(value) == "table" and value.Type == "Color3" then
+						local color = Color3.new(value.R, value.G, value.B)
+						element:SetColor(color, value.Alpha)
+					else
+						-- Gọi hàm theo đúng type của Element
+						if element.type == "toggle" then element:SetState(value)
+						elseif element.type == "slider" then element:SetValue(value)
+						elseif element.type == "box" then element:SetValue(value)
+						elseif element.type == "list" then element:SetValue(value)
+						elseif element.type == "bind" then element:SetKey(value)
+						end
+					end
+				end
+			end
+			library:Notify({Title = "Thành công", Content = "Đã tải cấu hình: " .. fileName, Type = "success", Duration = 3})
+		else
+			library:Notify({Title = "Lỗi", Content = "File config bị hỏng!", Type = "error"})
+		end
+	else
+		library:Notify({Title = "Lỗi", Content = "Không tìm thấy cấu hình: " .. fileName, Type = "error"})
+	end
+end
+
+-- Xóa Config
+function library.ConfigManager:Delete(fileName)
+	if not delfile then return end
+	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
+	if isfile(path) then
+		delfile(path)
+		library:Notify({Title = "Thành công", Content = "Đã xóa cấu hình: " .. fileName, Type = "info"})
+	end
+end
+
+-- Lấy danh sách Configs
+function library.ConfigManager:GetConfigs()
+	local list = {}
+	if not isfolder or not listfiles then return list end
+	self:InitFolder()
+	for _, file in ipairs(listfiles(self.Folder .. "/Configs")) do
+		local fileName = file:match("([^/\\]+)$")
+		if fileName and fileName:find(self.Extension) then
+			table.insert(list, fileName:gsub(self.Extension, ""))
+		end
+	end
+	return list
+end
+
+function library:config(windowOrFolder)
+	library.ConfigManager:InitFolder()
+	local ConfigInput = ""
+	local ConfigDropdown
+	
+	windowOrFolder:AddDivider("Configuration")
+	
+	windowOrFolder:AddBox({
+		text = "Config Name",
+		placeholder = "Enter name here...",
+		callback = function(val) ConfigInput = val end
+	})
+	
+	ConfigDropdown = windowOrFolder:AddList({
+		text = "Saved Configs",
+		values = library.ConfigManager:GetConfigs(),
+		callback = function(val) ConfigInput = val end
+	})
+	
+	windowOrFolder:AddButton({
+		text = "Save Config",
+		color = Color3.fromRGB(80, 255, 140),
+		callback = function()
+			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please enter the config name", Type = "warning"}) end
+			library.ConfigManager:Save(ConfigInput)
+			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+			ConfigDropdown:SetValue(ConfigInput)
+		end
+	})
+	
+	windowOrFolder:AddButton({
+		text = "Load Config",
+		color = Color3.fromRGB(110, 150, 255),
+		callback = function()
+			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please select a config to load", Type = "warning"}) end
+			library.ConfigManager:Load(ConfigInput)
+		end
+	})
+	
+	windowOrFolder:AddButton({
+		text = "Delete Config",
+		color = Color3.fromRGB(255, 80, 80),
+		callback = function()
+			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please select a config to delete", Type = "warning"}) end
+			library.ConfigManager:Delete(ConfigInput)
+			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+			ConfigDropdown:SetValue("")
+		end
+	})
+	
+	windowOrFolder:AddButton({
+		text = "Refresh List",
+		callback = function()
+			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+		end
+	})
+	
+	windowOrFolder:AddDivider("Auto Save")
+	
+	windowOrFolder:AddToggle({
+		text = "Auto Save Config",
+		flag = "Config_AutoSave",
+		callback = function(state)
+			library.ConfigManager.IsAutoSaving = state
+			if state then
+				task.spawn(function()
+					while library.ConfigManager.IsAutoSaving do
+						task.wait(library.ConfigManager.AutoSaveInterval)
+						if ConfigInput ~= "" then
+							library.ConfigManager:Save(ConfigInput)
+						end
+					end
+				end)
+			end
+		end
+	})
 end
 
 wait(1)
