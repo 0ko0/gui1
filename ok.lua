@@ -3957,11 +3957,8 @@ function library:ToggleUI(keybind)
 	end
 end
 
---------------------------------------------------------------------------------
--- HỆ THỐNG CONFIG MANAGER (TỐI TÂN NHẤT)
---------------------------------------------------------------------------------
 library.ConfigManager = {
-	Folder = "SkibidiHub", -- Đổi tên thư mục mặc định của Hub bạn ở đây
+	Folder = "Skibidi", 
 	Extension = ".json",
 	AutoSaveInterval = 10,
 	IsAutoSaving = false
@@ -3969,7 +3966,6 @@ library.ConfigManager = {
 
 local HttpService = game:GetService("HttpService")
 
--- Đảm bảo thư mục tồn tại
 function library.ConfigManager:InitFolder()
 	if not isfolder then return end
 	if not isfolder(self.Folder) then
@@ -3980,7 +3976,6 @@ function library.ConfigManager:InitFolder()
 	end
 end
 
--- Xử lý mã hóa Dữ liệu (Bao gồm cả Color3)
 local function EncodeData()
 	local savedData = {}
 	for flag, element in pairs(library.Registry) do
@@ -3988,7 +3983,7 @@ local function EncodeData()
 		if typeof(value) == "Color3" then
 			savedData[flag] = {Type = "Color3", R = value.R, G = value.G, B = value.B, Alpha = element.transparency or 0}
 		elseif typeof(value) == "table" then
-			savedData[flag] = value -- Dropdown multiselect
+			savedData[flag] = value 
 		elseif typeof(value) ~= "function" and typeof(value) ~= "Instance" and typeof(value) ~= "userdata" then
 			savedData[flag] = value
 		end
@@ -3996,22 +3991,20 @@ local function EncodeData()
 	return HttpService:JSONEncode(savedData)
 end
 
--- Lưu Config
 function library.ConfigManager:Save(fileName)
-	if not writefile then return library:Notify({Title = "Lỗi", Content = "Executor của bạn không hỗ trợ lưu file!", Type = "error"}) end
+	if not writefile then return library:Notify({Title = "error", Content = "Your executor does not support file saving", Type = "error"}) end
 	self:InitFolder()
 	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
 	local success, err = pcall(function()
 		writefile(path, EncodeData())
 	end)
 	if success then
-		library:Notify({Title = "Thành công", Content = "Đã lưu cấu hình: " .. fileName, Type = "success", Duration = 3})
+		library:Notify({Title = "success", Content = "Configuration saved: " .. fileName, Type = "success", Duration = 3})
 	else
-		library:Notify({Title = "Lỗi", Content = "Không thể lưu cấu hình: " .. tostring(err), Type = "error"})
+		library:Notify({Title = "error", Content = "Failed to save configuration: " .. tostring(err), Type = "error"})
 	end
 end
 
--- Tải Config
 function library.ConfigManager:Load(fileName)
 	if not readfile then return end
 	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
@@ -4028,7 +4021,7 @@ function library.ConfigManager:Load(fileName)
 						local color = Color3.new(value.R, value.G, value.B)
 						element:SetColor(color, value.Alpha)
 					else
-						-- Gọi hàm theo đúng type của Element
+						
 						if element.type == "toggle" then element:SetState(value)
 						elseif element.type == "slider" then element:SetValue(value)
 						elseif element.type == "box" then element:SetValue(value)
@@ -4038,26 +4031,24 @@ function library.ConfigManager:Load(fileName)
 					end
 				end
 			end
-			library:Notify({Title = "Thành công", Content = "Đã tải cấu hình: " .. fileName, Type = "success", Duration = 3})
+			library:Notify({Title = "success", Content = "Configuration loaded: " .. fileName, Type = "success", Duration = 3})
 		else
-			library:Notify({Title = "Lỗi", Content = "File config bị hỏng!", Type = "error"})
+			library:Notify({Title = "error", Content = "The config file is corrupted", Type = "error"})
 		end
 	else
-		library:Notify({Title = "Lỗi", Content = "Không tìm thấy cấu hình: " .. fileName, Type = "error"})
+		library:Notify({Title = "error", Content = "Config not found: " .. fileName, Type = "error"})
 	end
 end
 
--- Xóa Config
 function library.ConfigManager:Delete(fileName)
 	if not delfile then return end
 	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
 	if isfile(path) then
 		delfile(path)
-		library:Notify({Title = "Thành công", Content = "Đã xóa cấu hình: " .. fileName, Type = "info"})
+		library:Notify({Title = "success", Content = "Configuration deleted: " .. fileName, Type = "info"})
 	end
 end
 
--- Lấy danh sách Configs
 function library.ConfigManager:GetConfigs()
 	local list = {}
 	if not isfolder or not listfiles then return list end
@@ -4072,6 +4063,13 @@ function library.ConfigManager:GetConfigs()
 end
 
 function library:config(windowOrFolder)
+	
+	windowOrFolder = windowOrFolder or self.windows[1] 
+	if not windowOrFolder then
+		warn("[Library] Error: Please create a window before calling the config function")
+		return
+	end
+
 	library.ConfigManager:InitFolder()
 	local ConfigInput = ""
 	local ConfigDropdown
