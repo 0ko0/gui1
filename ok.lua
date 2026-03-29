@@ -3829,15 +3829,30 @@ end
 function library:SetToggle(keybind)
 	local toggleKey = typeof(keybind) == "EnumItem" and keybind or Enum.KeyCode.RightControl
 
+	local toggleBtn
+
+	local function updateIcon()
+		if toggleBtn then
+			if library.open then
+				
+				toggleBtn.Image = "rbxassetid://103716814450925"
+			else
+				
+				toggleBtn.Image = "rbxassetid://97804802611653"
+			end
+		end
+	end
+
 	inputService.InputBegan:Connect(function(input, gameProcessed)
 		if not gameProcessed and input.KeyCode == toggleKey then
 			library:Close()
+			updateIcon() 
 		end
 	end)
 
 	if inputService.TouchEnabled then
 		local toggleGui = Instance.new("ScreenGui")
-		toggleGui.Name = "mobile"
+		toggleGui.Name = "Mobile"
 		toggleGui.ResetOnSpawn = false
 		toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
@@ -3851,14 +3866,14 @@ function library:SetToggle(keybind)
 				toggleGui.Parent = CoreGui
 			end
 		end)
-
-		local toggleBtn = Instance.new("ImageButton")
+		
+		toggleBtn = Instance.new("ImageButton")
 		toggleBtn.Name = "ToggleBtn"
 		toggleBtn.Position = UDim2.new(0, 10, 0.5, -25)
 		toggleBtn.Size = UDim2.new(0, 40, 0, 40)
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-		toggleBtn.Image = "rbxassetid://137243330484050" 
-		toggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)		
+		toggleBtn.Image = library.open and "rbxassetid://103716814450925" or "rbxassetid://97804802611653"
+		toggleBtn.ImageColor3 = Color3.fromRGB(110, 150, 255)
 		toggleBtn.Parent = toggleGui
 
 		local corner = Instance.new("UICorner")
@@ -3869,7 +3884,7 @@ function library:SetToggle(keybind)
 		stroke.Color = Color3.fromRGB(110, 150, 255)
 		stroke.Thickness = 2
 		stroke.Parent = toggleBtn
-		
+
 		local dragging = false
 		local dragStart = nil
 		local startPos = nil
@@ -3887,7 +3902,7 @@ function library:SetToggle(keybind)
 		toggleBtn.InputChanged:Connect(function(input)
 			if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
 				local delta = input.Position - dragStart
-				if delta.Magnitude > 5 then 
+				if delta.Magnitude > 5 then
 					isClick = false 
 					toggleBtn.Position = UDim2.new(
 						startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -3902,10 +3917,11 @@ function library:SetToggle(keybind)
 				dragging = false
 				if isClick then
 					library:Close() 
+					updateIcon() 
 										
-					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 40, 0, 40)}):Play()
+					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 35, 0, 35)}):Play()
 					task.wait(0.1)
-					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 45, 0, 45)}):Play()
+					tweenService:Create(toggleBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 40, 0, 40)}):Play()
 				end
 			end
 		end)
