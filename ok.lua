@@ -3849,7 +3849,7 @@ function library:Notify(options)
 	end)
 end
 
-function library:SetToggle(keybind)
+function library:ToggleUI(keybind)
 	local toggleKey = typeof(keybind) == "EnumItem" and keybind or Enum.KeyCode.RightControl
 
 	local toggleBtn
