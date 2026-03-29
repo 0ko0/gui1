@@ -6,7 +6,7 @@ local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/0ko0/
 
 ### Adding Tab
 ```lua
-local window = library:CreateWindow({
+local tab = library:CreateWindow({
     Title = "Window",
     Width = 210,       
     MaxHeight = 400    
