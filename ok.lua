@@ -3857,8 +3857,8 @@ function library:SetToggle(keybind)
 		toggleBtn.Position = UDim2.new(0, 10, 0.5, -25)
 		toggleBtn.Size = UDim2.new(0, 40, 0, 40)
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-		toggleBtn.Image = "rbxassetid://106145589924979" 
-		toggleBtn.ImageColor3 = Color3.fromRGB(110, 150, 255)
+		toggleBtn.Image = "rbxassetid://137243330484050" 
+		toggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 		toggleBtn.Parent = toggleGui
 
 		local corner = Instance.new("UICorner")
