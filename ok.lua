@@ -83,12 +83,17 @@ end
 
 local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 	local size = subHolder and 34 or 40
-	local MAX_MENU_HEIGHT = 400 
+	local MAX_MENU_HEIGHT = parentTable.maxHeight or 400 
+	local menuWidth = parentTable.width or 230
+
+	
+	local xOffset = subHolder and 0 or (20 + ((menuWidth + 20) * (parentTable.position or 0)))
 
 	parentTable.main = library:Create("Frame", {
 		LayoutOrder = subHolder and parentTable.position or 0,
-		Position = UDim2.new(0, 20 + (250 * (parentTable.position or 0)), 0, 20),
-		Size = UDim2.new(0, 230, 0, size),
+		Position = UDim2.new(0, xOffset, 0, 20),
+		
+		Size = UDim2.new(subHolder and 1 or 0, subHolder and 0 or menuWidth, 0, size),
 		BackgroundColor3 = Color3.fromRGB(15, 15, 17),
 		BackgroundTransparency = subHolder and 1 or 0.05,
 		ClipsDescendants = false, 
@@ -207,7 +212,9 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 		parentTable.content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
 		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
 		if parentTable.open then
-			parentTable.main.Size = #parentTable.options > 0 and UDim2.new(0, 230, 0, targetHeight) or UDim2.new(0, 230, 0, size)
+			local newWidthScale = subHolder and 1 or 0
+			local newWidthOffset = subHolder and 0 or menuWidth
+			parentTable.main.Size = #parentTable.options > 0 and UDim2.new(newWidthScale, newWidthOffset, 0, targetHeight) or UDim2.new(newWidthScale, newWidthOffset, 0, size)
 		end
 	end)
 
@@ -297,7 +304,9 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 		bottomHider.BackgroundTransparency = parentTable.open and 0 or 1
 		
 		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
-		local endSize = (#parentTable.options > 0 and parentTable.open) and UDim2.new(0, 230, 0, targetHeight) or UDim2.new(0, 230, 0, size)
+		local newWidthScale = subHolder and 1 or 0
+		local newWidthOffset = subHolder and 0 or menuWidth
+		local endSize = (#parentTable.options > 0 and parentTable.open) and UDim2.new(newWidthScale, newWidthOffset, 0, targetHeight) or UDim2.new(newWidthScale, newWidthOffset, 0, size)
 		
 		tweenService:Create(parentTable.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = endSize}):Play()
 	end
@@ -3101,8 +3110,22 @@ function parent:AddDivider(option)
 end
 
 function library:CreateWindow(options)
-	local titleText = typeof(options) == "string" and options or (options.Title or options.title or "Window")
-	local window = {title = tostring(titleText), options = {}, open = true, canInit = true, init = false, position = #self.windows}
+	local isTable = typeof(options) == "table"
+	local titleText = isTable and (options.Title or options.title or "Window") or (typeof(options) == "string" and options or "Window")
+		
+	local windowWidth = isTable and (options.Width or options.width or options.Size or 230) or 230
+	local windowMaxHeight = isTable and (options.MaxHeight or options.maxHeight or 400) or 400
+
+	local window = {
+		title = tostring(titleText), 
+		width = tonumber(windowWidth),
+		maxHeight = tonumber(windowMaxHeight),
+		options = {}, 
+		open = true, 
+		canInit = true, 
+		init = false, 
+		position = #self.windows
+	}
 
 	getFnctions(window)
 	
@@ -3835,10 +3858,10 @@ function library:SetToggle(keybind)
 		if toggleBtn then
 			if library.open then
 				
-				toggleBtn.Image = "rbxassetid://103716814450925"
+				toggleBtn.Image = "rbxassetid://97536509958555"
 			else
 				
-				toggleBtn.Image = "rbxassetid://97804802611653"
+				toggleBtn.Image = "rbxassetid://105048918205765"
 			end
 		end
 	end
@@ -3872,7 +3895,7 @@ function library:SetToggle(keybind)
 		toggleBtn.Position = UDim2.new(0, 10, 0.5, -25)
 		toggleBtn.Size = UDim2.new(0, 40, 0, 40)
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)		
-		toggleBtn.Image = library.open and "rbxassetid://103716814450925" or "rbxassetid://97804802611653"
+		toggleBtn.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
 		toggleBtn.ImageColor3 = Color3.fromRGB(110, 150, 255)
 		toggleBtn.Parent = toggleGui
 
