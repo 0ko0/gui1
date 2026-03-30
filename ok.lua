@@ -3893,8 +3893,7 @@ function library:ToggleUI(keybind)
 		shadow.Image = "rbxassetid://6015897843"
 		shadow.ImageColor3 = accentColor
 		shadow.ImageTransparency = 0.5
-		shadow.ScaleType = Enum.ScaleType.Slice
-		shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+		
 		shadow.Parent = mainContainer
 
 		local toggleBtn = Instance.new("TextButton")
@@ -3908,9 +3907,9 @@ function library:ToggleUI(keybind)
 		toggleBtn.Parent = mainContainer
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(1, 0)
+		corner.CornerRadius = UDim.new(1, 0) 
 		corner.Parent = toggleBtn
-		
+
 		local stroke = Instance.new("UIStroke")
 		stroke.Thickness = 2
 		stroke.Parent = toggleBtn
@@ -3922,7 +3921,7 @@ function library:ToggleUI(keybind)
 			ColorSequenceKeypoint.new(1, accentColor)
 		})
 		strokeGradient.Parent = stroke
-		
+
 		local icon = Instance.new("ImageLabel")
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)
 		icon.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -3942,7 +3941,7 @@ function library:ToggleUI(keybind)
 				shadow.ImageTransparency = 0.4 + math.sin(tick() * 3) * 0.2
 			end
 		end)
-		
+
 		local dragging, dragStart, startPos, isClick
 		
 		toggleBtn.InputBegan:Connect(function(input)
@@ -3964,7 +3963,6 @@ function library:ToggleUI(keybind)
 				local delta = input.Position - dragStart
 				if delta.Magnitude > 5 then
 					isClick = false 
-					
 					mainContainer.Position = UDim2.new(
 						startPos.X.Scale, startPos.X.Offset + delta.X,
 						startPos.Y.Scale, startPos.Y.Offset + delta.Y
@@ -3976,29 +3974,31 @@ function library:ToggleUI(keybind)
 		toggleBtn.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = false
-
+				
 				tweenService:Create(mainContainer, TweenInfo.new(0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
 					Size = UDim2.new(0, 46, 0, 46)
 				}):Play()
 				tweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 2}):Play()
 
-				if isClick then
-					
+				if isClick then					
 					library:Close() 
 										
-					local ripple = Instance.new("ImageLabel")
+					local ripple = Instance.new("Frame")
 					ripple.AnchorPoint = Vector2.new(0.5, 0.5)
 					ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
 					ripple.Size = UDim2.new(0, 0, 0, 0)
-					ripple.BackgroundTransparency = 1
-					ripple.Image = "rbxassetid://2708891598"
-					ripple.ImageColor3 = accentColor
-					ripple.ImageTransparency = 0.4
+					ripple.BackgroundColor3 = accentColor
+					ripple.BackgroundTransparency = 0.2
+					ripple.BorderSizePixel = 0
 					ripple.Parent = toggleBtn
+
+					local rippleCorner = Instance.new("UICorner")
+					rippleCorner.CornerRadius = UDim.new(1, 0)
+					rippleCorner.Parent = ripple
 
 					tweenService:Create(ripple, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 						Size = UDim2.new(0, 150, 0, 150),
-						ImageTransparency = 1
+						BackgroundTransparency = 1
 					}):Play()
 					game.Debris:AddItem(ripple, 0.6)
 
@@ -4006,8 +4006,7 @@ function library:ToggleUI(keybind)
 						Rotation = 180, ImageTransparency = 1, Size = UDim2.new(0, 10, 0, 10)
 					}):Play()
 
-					task.delay(0.2, function()
-						
+					task.delay(0.2, function()		
 						icon.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
 						icon.Rotation = -180
 												
