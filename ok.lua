@@ -3891,27 +3891,27 @@ function library:ToggleUI(keybind)
 		dragHitbox.Position = UDim2.new(0, 20, 0.5, -24)
 		dragHitbox.BackgroundTransparency = 1
 		dragHitbox.Parent = toggleGui
-
+		
 		auraGlow = Instance.new("ImageLabel")
 		auraGlow.AnchorPoint = Vector2.new(0.5, 0.5)
 		auraGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
 		auraGlow.Size = UDim2.new(1, 40, 1, 40)
 		auraGlow.BackgroundTransparency = 1
-		auraGlow.Image = "rbxassetid://1316045217" 
+		auraGlow.Image = "rbxassetid://10499625345" 
 		auraGlow.ImageColor3 = Color3.fromRGB(110, 150, 255)
 		auraGlow.ImageTransparency = 0.5
-		auraGlow.ScaleType = Enum.ScaleType.Stretch 
+		auraGlow.ScaleType = Enum.ScaleType.Stretch
 		auraGlow.ZIndex = 0
 		auraGlow.Parent = dragHitbox
-		
+				
 		local shadow = Instance.new("ImageLabel")
 		shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 		shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
-		shadow.Size = UDim2.new(1, 10, 1, 10)
+		shadow.Size = UDim2.new(1, 15, 1, 15)
 		shadow.BackgroundTransparency = 1
-		shadow.Image = "rbxassetid://1316045217" 
+		shadow.Image = "rbxassetid://10499625345" 
 		shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-		shadow.ImageTransparency = 0.5
+		shadow.ImageTransparency = 0.6
 		shadow.ScaleType = Enum.ScaleType.Stretch
 		shadow.ZIndex = 1
 		shadow.Parent = dragHitbox
@@ -3930,7 +3930,7 @@ function library:ToggleUI(keybind)
 		toggleBtn.Parent = dragHitbox
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0.5, 0) 
+		corner.CornerRadius = UDim.new(1, 0) 
 		corner.Parent = toggleBtn
 		
 		local stroke = Instance.new("UIStroke")
