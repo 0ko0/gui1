@@ -3857,27 +3857,20 @@ end
 
 function library:ToggleUI(keybind)
 	local toggleKey = typeof(keybind) == "EnumItem" and keybind or Enum.KeyCode.RightControl
-	local toggleBtn, iconImage, auraGlow, strokeGradient
-	local isMobile = inputService.TouchEnabled or inputService:GetLastInputType() == Enum.UserInputType.Touch
+	local accentColor = Color3.fromRGB(110, 150, 255)
 
 	inputService.InputBegan:Connect(function(input, gameProcessed)
 		if not gameProcessed and input.KeyCode == toggleKey then
 			library:Close()
-			if iconImage then
-				
-				tweenService:Create(iconImage, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Rotation = library.open and 0 or 360}):Play()
-				iconImage.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
-			end
 		end
 	end)
-	
-	if isMobile or true then 
+
+	if inputService.TouchEnabled or true then 
 		local toggleGui = Instance.new("ScreenGui")
-		toggleGui.Name = "skibidii"
+		toggleGui.Name = "mobile"
 		toggleGui.ResetOnSpawn = false
 		toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-		toggleGui.IgnoreGuiInset = true
-		
+
 		pcall(function()
 			local CoreGui = game:GetService("CoreGui")
 			if gethui then toggleGui.Parent = gethui()
@@ -3885,193 +3878,143 @@ function library:ToggleUI(keybind)
 			else toggleGui.Parent = CoreGui end
 		end)
 		
-		local dragHitbox = Instance.new("Frame")
-		dragHitbox.Name = "DragHitbox"
-		dragHitbox.Size = UDim2.new(0, 48, 0, 48)
-		dragHitbox.Position = UDim2.new(0, 20, 0.5, -24)
-		dragHitbox.BackgroundTransparency = 1
-		dragHitbox.Parent = toggleGui
-		
-		auraGlow = Instance.new("ImageLabel")
-		auraGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-		auraGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-		auraGlow.Size = UDim2.new(1, 40, 1, 40)
-		auraGlow.BackgroundTransparency = 1
-		auraGlow.Image = "rbxassetid://10499625345" 
-		auraGlow.ImageColor3 = Color3.fromRGB(110, 150, 255)
-		auraGlow.ImageTransparency = 0.5
-		auraGlow.ScaleType = Enum.ScaleType.Stretch
-		auraGlow.ZIndex = 0
-		auraGlow.Parent = dragHitbox
-				
+		local mainContainer = Instance.new("Frame")
+		mainContainer.Name = "ToggleContainer"
+		mainContainer.Position = UDim2.new(0, 20, 0.5, -25)
+		mainContainer.Size = UDim2.new(0, 46, 0, 46)
+		mainContainer.BackgroundTransparency = 1
+		mainContainer.Parent = toggleGui
+
 		local shadow = Instance.new("ImageLabel")
 		shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-		shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
-		shadow.Size = UDim2.new(1, 15, 1, 15)
+		shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+		shadow.Size = UDim2.new(1, 30, 1, 30)
 		shadow.BackgroundTransparency = 1
-		shadow.Image = "rbxassetid://10499625345" 
-		shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-		shadow.ImageTransparency = 0.6
-		shadow.ScaleType = Enum.ScaleType.Stretch
-		shadow.ZIndex = 1
-		shadow.Parent = dragHitbox
-		
-		toggleBtn = Instance.new("TextButton")
-		toggleBtn.Name = "MainButton"
-		toggleBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-		toggleBtn.Position = UDim2.new(0.5, 0, 0.5, 0)
+		shadow.Image = "rbxassetid://6015897843"
+		shadow.ImageColor3 = accentColor
+		shadow.ImageTransparency = 0.5
+		shadow.ScaleType = Enum.ScaleType.Slice
+		shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+		shadow.Parent = mainContainer
+
+		local toggleBtn = Instance.new("TextButton")
+		toggleBtn.Name = "ToggleBtn"
 		toggleBtn.Size = UDim2.new(1, 0, 1, 0)
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-		toggleBtn.BackgroundTransparency = 0.15
-		toggleBtn.AutoButtonColor = false
+		toggleBtn.BackgroundTransparency = 0.2
 		toggleBtn.Text = ""
+		toggleBtn.AutoButtonColor = false
 		toggleBtn.ClipsDescendants = true
-		toggleBtn.ZIndex = 2
-		toggleBtn.Parent = dragHitbox
+		toggleBtn.Parent = mainContainer
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(1, 0) 
+		corner.CornerRadius = UDim.new(1, 0)
 		corner.Parent = toggleBtn
 		
 		local stroke = Instance.new("UIStroke")
 		stroke.Thickness = 2
-		stroke.Color = Color3.fromRGB(255, 255, 255)
 		stroke.Parent = toggleBtn
 
-		strokeGradient = Instance.new("UIGradient")
+		local strokeGradient = Instance.new("UIGradient")
 		strokeGradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 150, 255)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 110, 255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(110, 150, 255))
+			ColorSequenceKeypoint.new(0, accentColor),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+			ColorSequenceKeypoint.new(1, accentColor)
 		})
 		strokeGradient.Parent = stroke
 		
-		iconImage = Instance.new("ImageLabel")
-		iconImage.AnchorPoint = Vector2.new(0.5, 0.5)
-		iconImage.Position = UDim2.new(0.5, 0, 0.5, 0)
-		iconImage.Size = UDim2.new(0, 24, 0, 24)
-		iconImage.BackgroundTransparency = 1
-		iconImage.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
-		iconImage.ImageColor3 = Color3.fromRGB(240, 240, 245)
-		iconImage.ZIndex = 3
-		iconImage.Parent = toggleBtn
+		local icon = Instance.new("ImageLabel")
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+		icon.Size = UDim2.new(0, 22, 0, 22)
+		icon.BackgroundTransparency = 1
+		icon.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
+		icon.ImageColor3 = Color3.fromRGB(240, 240, 240)
+		icon.Parent = toggleBtn
 		
 		local rotation = 0
-		local auraPulse = 0
-		runService.Heartbeat:Connect(function(dt)
-			if toggleGui.Parent then				
-				rotation = (rotation + dt * 100) % 360
+		runService.RenderStepped:Connect(function(dt)
+			if toggleGui.Parent then
+				
+				rotation = (rotation + dt * 120) % 360
 				strokeGradient.Rotation = rotation
 								
-				auraPulse = auraPulse + dt * 3
-				auraGlow.Size = UDim2.new(1, 35 + math.sin(auraPulse) * 10, 1, 35 + math.sin(auraPulse) * 10)
-				auraGlow.ImageTransparency = 0.5 + math.sin(auraPulse) * 0.2
+				shadow.ImageTransparency = 0.4 + math.sin(tick() * 3) * 0.2
 			end
 		end)
 		
-		local dragging = false
-		local isClick = true
-		local dragStartPos = nil
-		local startHitboxPos = nil
-		local targetPos = dragHitbox.Position
+		local dragging, dragStart, startPos, isClick
 		
-		runService.RenderStepped:Connect(function()
-			if not dragging then
-				
-				dragHitbox.Position = dragHitbox.Position:Lerp(targetPos, 0.15)
-			else
-				
-				targetPos = dragHitbox.Position
-			end
-		end)
-		
-		local function createRipple(x, y)
-			local ripple = Instance.new("ImageLabel")
-			ripple.BackgroundTransparency = 1
-			ripple.Image = "rbxassetid://2708891598"
-			ripple.ImageColor3 = Color3.fromRGB(255, 255, 255)
-			ripple.ImageTransparency = 0.6
-			ripple.ZIndex = 4
-			ripple.AnchorPoint = Vector2.new(0.5, 0.5)
-			ripple.Position = UDim2.new(0, x, 0, y)
-			ripple.Size = UDim2.new(0, 0, 0, 0)
-			ripple.Parent = toggleBtn
-
-			tweenService:Create(ripple, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Size = UDim2.new(0, 100, 0, 100),
-				ImageTransparency = 1
-			}):Play()
-			game.Debris:AddItem(ripple, 0.4)
-		end
-
 		toggleBtn.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = true
 				isClick = true
-				dragStartPos = input.Position
-				startHitboxPos = dragHitbox.Position
+				dragStart = input.Position
+				startPos = mainContainer.Position
 				
-				tweenService:Create(toggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(1, -8, 1, -8)}):Play()
-				tweenService:Create(iconImage, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 18, 0, 18)}):Play()
+				tweenService:Create(mainContainer, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+					Size = UDim2.new(0, 40, 0, 40)
+				}):Play()
+				tweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 3}):Play()
 			end
 		end)
 
 		toggleBtn.InputChanged:Connect(function(input)
 			if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-				local delta = input.Position - dragStartPos
+				local delta = input.Position - dragStart
 				if delta.Magnitude > 5 then
 					isClick = false 
+					
+					mainContainer.Position = UDim2.new(
+						startPos.X.Scale, startPos.X.Offset + delta.X,
+						startPos.Y.Scale, startPos.Y.Offset + delta.Y
+					)
 				end
-				
-				local viewport = workspace.CurrentCamera.ViewportSize
-				local newX = math.clamp(startHitboxPos.X.Offset + delta.X, 0, viewport.X - 48)
-				local newY = math.clamp(startHitboxPos.Y.Offset + delta.Y, 0, viewport.Y - 48)
-				
-				dragHitbox.Position = UDim2.new(0, newX, 0, newY)
-				targetPos = dragHitbox.Position 
 			end
 		end)
 
 		toggleBtn.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = false
-				
-				tweenService:Create(toggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-				tweenService:Create(iconImage, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 24, 0, 24)}):Play()
+
+				tweenService:Create(mainContainer, TweenInfo.new(0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+					Size = UDim2.new(0, 46, 0, 46)
+				}):Play()
+				tweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 2}):Play()
 
 				if isClick then
-					targetPos = dragHitbox.Position 
-
-					local relativeX = input.Position.X - toggleBtn.AbsolutePosition.X
-					local relativeY = input.Position.Y - toggleBtn.AbsolutePosition.Y
-					createRipple(relativeX, relativeY)
 					
-					library:Close()
+					library:Close() 
 										
-					local newColor = library.open and Color3.fromRGB(110, 150, 255) or Color3.fromRGB(110, 150, 255)
-					strokeGradient.Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, newColor),
-						ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-						ColorSequenceKeypoint.new(1, newColor)
-					})
-					auraGlow.ImageColor3 = newColor
-					
-					tweenService:Create(iconImage, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Rotation = library.open and 0 or 360}):Play()
-					iconImage.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
-				else
-					
-					local viewport = workspace.CurrentCamera.ViewportSize
-					local currentX = dragHitbox.Position.X.Offset
-					local currentY = dragHitbox.Position.Y.Offset
-					
-					local snapX
-					if currentX < (viewport.X / 2) then
-						snapX = 15 
-					else
-						snapX = viewport.X - 48 - 15 
-					end
-					
-					targetPos = UDim2.new(0, snapX, 0, currentY)
+					local ripple = Instance.new("ImageLabel")
+					ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+					ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+					ripple.Size = UDim2.new(0, 0, 0, 0)
+					ripple.BackgroundTransparency = 1
+					ripple.Image = "rbxassetid://2708891598"
+					ripple.ImageColor3 = accentColor
+					ripple.ImageTransparency = 0.4
+					ripple.Parent = toggleBtn
+
+					tweenService:Create(ripple, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+						Size = UDim2.new(0, 150, 0, 150),
+						ImageTransparency = 1
+					}):Play()
+					game.Debris:AddItem(ripple, 0.6)
+
+					tweenService:Create(icon, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Rotation = 180, ImageTransparency = 1, Size = UDim2.new(0, 10, 0, 10)
+					}):Play()
+
+					task.delay(0.2, function()
+						
+						icon.Image = library.open and "rbxassetid://97536509958555" or "rbxassetid://105048918205765"
+						icon.Rotation = -180
+												
+						tweenService:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+							Rotation = 0, ImageTransparency = 0, Size = UDim2.new(0, 22, 0, 22)
+						}):Play()
+					end)
 				end
 			end
 		end)
