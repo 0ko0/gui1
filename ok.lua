@@ -4194,243 +4194,323 @@ function library:config(windowOrFolder)
 	})
 end
 
-function library:InitDevConsole(options)
-	options = options or {}
-	local toggleKey = options.ToggleKey or Enum.KeyCode.F9
-	local showMobileToggle = options.ShowMobileToggle ~= false 
-	
-	if self.DevConsoleInited then return end
-	self.DevConsoleInited = true
-
+coroutine.wrap(function()
 	local ScriptContext = game:GetService("ScriptContext")
 	local LogService = game:GetService("LogService")
-	local inputService = game:GetService("UserInputService")
-	local textService = game:GetService("TextService")
-	local tweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local TweenService = game:GetService("TweenService")
+	local CoreGui = game:GetService("CoreGui")
+	local Players = game:GetService("Players")
+	local TextService = game:GetService("TextService")
+	local HttpService = game:GetService("HttpService")
+	local RunService = game:GetService("RunService")
+	local Stats = game:GetService("Stats")
+	
+	local isMobile = UserInputService.TouchEnabled
+	local localPlayer = Players.LocalPlayer
 
-	local devGui = self:Create("ScreenGui", { Name = "DevConsole", ResetOnSpawn = false })
-	pcall(function() ProtectGui(devGui) end)
+	local consoleGui, mainFrame, scroll, floatBtn
+	local logCache = {}
+	local MAX_LOGS = 150
+	local isVisible = false
+	local floatVisible = false
+	local searchTerm = ""
+	local activeFilters = {Error = true, Warn = true, Info = true}
 
-	local mainFrame = self:Create("Frame", {
-		Size = UDim2.new(0, 500, 0, 320),
-		Position = UDim2.new(0.5, -250, 0.5, -160),
-		BackgroundColor3 = Color3.fromRGB(15, 15, 18),
-		BackgroundTransparency = 0.05,
-		BorderSizePixel = 0,
-		Visible = false,
-		Parent = devGui,
-		Active = true
-	})
-	self:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = mainFrame })
-	self:Create("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1.5, Transparency = 0.3, Parent = mainFrame })
+	local function SafeProtect(gui)
+		local s = pcall(function()
+			if gethui then gui.Parent = gethui()
+			elseif CoreGui:FindFirstChild("RobloxGui") then gui.Parent = CoreGui.RobloxGui
+			else gui.Parent = CoreGui end
+		end)
+		if not s then gui.Parent = localPlayer:WaitForChild("PlayerGui") end
+	end
 
-	local topBar = self:Create("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundColor3 = Color3.fromRGB(25, 25, 30),
-		BorderSizePixel = 0,
-		Parent = mainFrame
-	})
-	self:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = topBar })
-	self:Create("Frame", { Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6), BackgroundColor3 = Color3.fromRGB(25, 25, 30), BorderSizePixel = 0, Parent = topBar })
+	local function BuildUI()
+		if consoleGui and consoleGui.Parent then return end
 
-	self:Create("TextLabel", {
-		Size = UDim2.new(1, -100, 1, 0),
-		Position = UDim2.new(0, 12, 0, 0),
-		BackgroundTransparency = 1,
-		Text = "Developer Console (" .. toggleKey.Name .. ")",
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(240, 240, 245),
-		TextSize = 13,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = topBar
-	})
+		consoleGui = Instance.new("ScreenGui")
+		consoleGui.Name = HttpService:GenerateGUID(false)
+		consoleGui.ResetOnSpawn = false
+		consoleGui.DisplayOrder = 2147483647
+		SafeProtect(consoleGui)
 
-	local closeBtn = self:Create("TextButton", {
-		Size = UDim2.new(0, 30, 0, 22),
-		Position = UDim2.new(1, -35, 0, 5),
-		BackgroundColor3 = Color3.fromRGB(255, 80, 80),
-		BackgroundTransparency = 0.8,
-		Text = "X",
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(255, 200, 200),
-		TextSize = 12,
-		AutoButtonColor = false,
-		Parent = topBar
-	})
-	self:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = closeBtn })
-	closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+		mainFrame = Instance.new("Frame", consoleGui)
+		mainFrame.Size = UDim2.new(isMobile and 0.95 or 0.6, 0, isMobile and 0.65 or 0.6, 0)
+		mainFrame.Position = UDim2.new((1 - mainFrame.Size.X.Scale)/2, 0, (1 - mainFrame.Size.Y.Scale)/2, 0)
+		mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+		mainFrame.BorderSizePixel = 0
+		mainFrame.Visible = isVisible
+		mainFrame.Active = true
+		mainFrame.ClipsDescendants = true
+		Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+		local mainStroke = Instance.new("UIStroke", mainFrame)
+		mainStroke.Color = Color3.fromRGB(80, 80, 110); mainStroke.Thickness = 1.5
 
-	local clearBtn = self:Create("TextButton", {
-		Size = UDim2.new(0, 60, 0, 22),
-		Position = UDim2.new(1, -100, 0, 5),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 45),
-		Text = "Clear",
-		Font = Enum.Font.GothamMedium,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		TextSize = 12,
-		AutoButtonColor = false,
-		Parent = topBar
-	})
-	self:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = clearBtn })
+		local bgGrad = Instance.new("UIGradient", mainFrame)
+		bgGrad.Rotation = 90
+		bgGrad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 25)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 12))
+		})
 
-	local scroll = self:Create("ScrollingFrame", {
-		Size = UDim2.new(1, -10, 1, -42),
-		Position = UDim2.new(0, 5, 0, 37),
-		BackgroundTransparency = 1,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = Color3.fromRGB(110, 150, 255),
-		CanvasSize = UDim2.new(0, 0, 0, 0),
-		Parent = mainFrame
-	})
-	local layout = self:Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = scroll })
+		local topBar = Instance.new("Frame", mainFrame)
+		topBar.Size = UDim2.new(1, 0, 0, 40); topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30); topBar.BorderSizePixel = 0
+		Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
+		local hider = Instance.new("Frame", topBar); hider.Size = UDim2.new(1, 0, 0, 8); hider.Position = UDim2.new(0, 0, 1, -8); hider.BackgroundColor3 = Color3.fromRGB(25, 25, 30); hider.BorderSizePixel = 0
+		Instance.new("Frame", topBar).Size = UDim2.new(1, 0, 0, 1); Instance.new("Frame", topBar).Position = UDim2.new(0, 0, 1, -1); Instance.new("Frame", topBar).BackgroundColor3 = Color3.fromRGB(50, 50, 65); Instance.new("Frame", topBar).BorderSizePixel = 0
 
-	local dragToggle, dragStart, startPos
-	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragToggle = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
+		local title = Instance.new("TextLabel", topBar)
+		title.Size = UDim2.new(0, 120, 1, 0); title.Position = UDim2.new(0, 15, 0, 0); title.BackgroundTransparency = 1
+		title.Text = "CONSOLE"
+		title.Font = Enum.Font.GothamBold; title.TextColor3 = Color3.fromRGB(150, 180, 255); title.TextSize = 13; title.TextXAlignment = Enum.TextXAlignment.Left
+
+		local diagText = Instance.new("TextLabel", topBar)
+		diagText.Size = UDim2.new(0, 200, 1, 0); diagText.Position = UDim2.new(0, 170, 0, 0); diagText.BackgroundTransparency = 1
+		diagText.Text = "FPS: -- | Ping: -- | RAM: --"
+		diagText.Font = Enum.Font.Code; diagText.TextColor3 = Color3.fromRGB(150, 150, 150); diagText.TextSize = 12; diagText.TextXAlignment = Enum.TextXAlignment.Left
+		
+		local searchBox = Instance.new("TextBox", topBar)
+		searchBox.Size = UDim2.new(0, 120, 0, 24); searchBox.Position = UDim2.new(1, -260, 0, 8)
+		searchBox.BackgroundColor3 = Color3.fromRGB(15, 15, 18); searchBox.PlaceholderText = "Search logs..."
+		searchBox.Font = Enum.Font.Gotham; searchBox.TextColor3 = Color3.fromRGB(255, 255, 255); searchBox.TextSize = 12
+		Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 4)
+		Instance.new("UIStroke", searchBox).Color = Color3.fromRGB(60, 60, 70)
+		searchBox:GetPropertyChangedSignal("Text"):Connect(function() searchTerm = searchBox.Text:lower(); RefreshLogs() end)
+
+		local function CreateTopBtn(text, color, posOffset)
+			local btn = Instance.new("TextButton", topBar)
+			btn.Size = UDim2.new(0, 40, 0, 24); btn.Position = UDim2.new(1, posOffset, 0, 8)
+			btn.BackgroundColor3 = color; btn.BackgroundTransparency = 0.8
+			btn.Text = text; btn.Font = Enum.Font.GothamBold; btn.TextColor3 = color; btn.TextSize = 11
+			Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", btn).Color = color; Instance.new("UIStroke", btn).Transparency = 0.5
+			return btn
 		end
-	end)
-	inputService.InputChanged:Connect(function(input)
-		if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			local delta = input.Position - dragStart
-			mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-	inputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragToggle = false
-		end
-	end)
+		
+		local exportBtn = CreateTopBtn("SAVE", Color3.fromRGB(100, 255, 100), -130)
+		local clearBtn = CreateTopBtn("CLR", Color3.fromRGB(255, 200, 100), -85)
+		local closeBtn = CreateTopBtn("X", Color3.fromRGB(255, 80, 80), -40)
+		closeBtn.MouseButton1Click:Connect(function() isVisible = false; mainFrame.Visible = false end)
+		clearBtn.MouseButton1Click:Connect(function() logCache = {}; for _,v in ipairs(scroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end end)
+		exportBtn.MouseButton1Click:Connect(function()
+			local out = "CONSOLE LOGS\n====================\n"
+			for _, l in ipairs(logCache) do out = out .. l.RawMsg .. "\n" end
+			if writefile then writefile("Logs_"..os.time()..".txt", out)
+			elseif setclipboard then setclipboard(out) end
+			exportBtn.Text = "ok"; task.delay(1, function() exportBtn.Text = "SAVE" end)
+		end)
 
-	local logCount = 0
-	local isErrorOnCooldown = false
+		scroll = Instance.new("ScrollingFrame", mainFrame)
+		scroll.Size = UDim2.new(1, -10, 1, -85); scroll.Position = UDim2.new(0, 5, 0, 45)
+		scroll.BackgroundTransparency = 1; scroll.ScrollBarThickness = isMobile and 0 or 4; scroll.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 170)
+		local sLayout = Instance.new("UIListLayout", scroll); sLayout.Padding = UDim.new(0, 4)
 
-	local function addLog(msg, logType, stack)
-		logCount = logCount + 1
-		local color = Color3.fromRGB(200, 200, 200)
-		local prefix = "[INFO]"
+		local bottomBar = Instance.new("Frame", mainFrame)
+		bottomBar.Size = UDim2.new(1, 0, 0, 35); bottomBar.Position = UDim2.new(0, 0, 1, -35)
+		bottomBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25); bottomBar.BorderSizePixel = 0
+		Instance.new("Frame", bottomBar).Size = UDim2.new(1, 0, 0, 1); Instance.new("Frame", bottomBar).BackgroundColor3 = Color3.fromRGB(50, 50, 65); Instance.new("Frame", bottomBar).BorderSizePixel = 0
+
+		local cmdInput = Instance.new("TextBox", bottomBar)
+		cmdInput.Size = UDim2.new(1, -70, 0, 25); cmdInput.Position = UDim2.new(0, 10, 0, 5)
+		cmdInput.BackgroundColor3 = Color3.fromRGB(15, 15, 18); cmdInput.PlaceholderText = "> Run Lua code here to debug live..."
+		cmdInput.Font = Enum.Font.Code; cmdInput.TextColor3 = Color3.fromRGB(200, 255, 200); cmdInput.TextSize = 13; cmdInput.TextXAlignment = Enum.TextXAlignment.Left
+		cmdInput.ClearTextOnFocus = false; Instance.new("UICorner", cmdInput).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", cmdInput).Color = Color3.fromRGB(60, 60, 80)
+
+		local execBtn = Instance.new("TextButton", bottomBar)
+		execBtn.Size = UDim2.new(0, 45, 0, 25); execBtn.Position = UDim2.new(1, -55, 0, 5)
+		execBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255); execBtn.BackgroundTransparency = 0.8
+		execBtn.Text = "EXEC"; execBtn.Font = Enum.Font.GothamBold; execBtn.TextColor3 = Color3.fromRGB(150, 180, 255); execBtn.TextSize = 12
+		Instance.new("UICorner", execBtn).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", execBtn).Color = Color3.fromRGB(100, 150, 255)
+
+		local function ExecuteCode()
+			if cmdInput.Text == "" then return end
+			local func, err = loadstring(cmdInput.Text)
+			if func then
+				local s, e = pcall(func)
+				if not s then processLog(e, Enum.MessageType.MessageError, "Live Executor") end
+			else processLog(err, Enum.MessageType.MessageError, "Compilation Error") end
+			cmdInput.Text = ""
+		end
+		execBtn.MouseButton1Click:Connect(ExecuteCode)
+		cmdInput.FocusLost:Connect(function(enter) if enter then ExecuteCode() end end)
+
+		local grip = Instance.new("ImageButton", mainFrame)
+		grip.Size = UDim2.new(0, 15, 0, 15); grip.Position = UDim2.new(1, -15, 1, -15)
+		grip.BackgroundTransparency = 1; grip.Image = "rbxassetid://4731308832"; grip.ImageColor3 = Color3.fromRGB(150, 150, 150); grip.ImageTransparency = 0.5
+		
+		local rDrag, rStartPos, rStartSize
+		grip.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				rDrag = true; rStartPos = input.Position; rStartSize = mainFrame.AbsoluteSize
+			end
+		end)
+		UserInputService.InputChanged:Connect(function(input)
+			if rDrag then
+				local delta = input.Position - rStartPos
+				local newX = math.clamp(rStartSize.X + delta.X, 300, 1000)
+				local newY = math.clamp(rStartSize.Y + delta.Y, 200, 800)
+				mainFrame.Size = UDim2.new(0, newX, 0, newY)
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(input) if rDrag then rDrag = false end end)
+
+		local dragToggle, dragStart, startPos
+		topBar.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = true; dragStart = input.Position; startPos = mainFrame.Position end
+		end)
+		UserInputService.InputChanged:Connect(function(input)
+			if dragToggle then
+				local delta = input.Position - dragStart
+				mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(input) if dragToggle then dragToggle = false end end)
+
+		if isMobile then
+			floatBtn = Instance.new("ImageButton", consoleGui)
+			floatBtn.Size = UDim2.new(0, 42, 0, 42); floatBtn.Position = UDim2.new(0, -20, 0.5, 0) 
+			floatBtn.BackgroundColor3 = Color3.fromRGB(255, 30, 30); floatBtn.BackgroundTransparency = 0.3
+			floatBtn.Image = "rbxassetid://74911985506134"; floatBtn.Visible = floatVisible
+			Instance.new("UICorner", floatBtn).CornerRadius = UDim.new(1, 0)
+			local fs = Instance.new("UIStroke", floatBtn); fs.Color = Color3.fromRGB(255, 100, 100); fs.Thickness = 2
+
+			local fDrag, fInp, fStart
+			floatBtn.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then fDrag = true; fInp = input; fStart = floatBtn.Position end
+			end)
+			UserInputService.InputChanged:Connect(function(input)
+				if fDrag and input == fInp then floatBtn.Position = UDim2.new(0, fStart.X.Offset + (input.Position.X - fInp.Position.X), 0, fStart.Y.Offset + (input.Position.Y - fInp.Position.Y)) end
+			end)
+			UserInputService.InputEnded:Connect(function(input) 
+				if fDrag and input == fInp then 
+					fDrag = false 
+					if (input.Position - fInp.Position).Magnitude < 10 then 
+						isVisible = not isVisible; mainFrame.Visible = isVisible 
+					else
+						
+						local vpX = workspace.CurrentCamera.ViewportSize.X
+						local targetX = floatBtn.AbsolutePosition.X > vpX/2 and (vpX - 22) or -20
+						TweenService:Create(floatBtn, TweenInfo.new(0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Position = UDim2.new(0, targetX, 0, floatBtn.Position.Y.Offset)}):Play()
+					end 
+				end 
+			end)
+		end
+
+		local lastTick = tick()
+		local frames = 0
+		RunService.Heartbeat:Connect(function()
+			frames = frames + 1
+			if tick() - lastTick >= 1 then
+				local ping = "0"
+				pcall(function() ping = tostring(math.round(localPlayer:GetNetworkPing() * 1000)) end)
+				local mem = "0"
+				pcall(function() mem = tostring(math.round(Stats:GetTotalMemoryUsageMb())) end)
+				if diagText then diagText.Text = string.format("FPS: %d | Ping: %sms | RAM: %sMB", frames, ping, mem) end
+				frames = 0; lastTick = tick()
+			end
+		end)
+	end
+
+	function RefreshLogs()
+		if not scroll then return end
+		local yOff = 0
+		for _, v in ipairs(scroll:GetChildren()) do
+			if v:IsA("TextButton") then
+				local match = searchTerm == "" or v.TextLabel.Text:lower():find(searchTerm)
+				v.Visible = match
+				if match then yOff = yOff + v.Size.Y.Offset + 4 end
+			end
+		end
+		scroll.CanvasSize = UDim2.new(0, 0, 0, yOff + 10)
+	end
+
+	function processLog(msg, logType, stack)
+		msg = tostring(msg); stack = stack and tostring(stack) or ""
+		local color = logType == Enum.MessageType.MessageError and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(255, 200, 80)
+		local lType = logType == Enum.MessageType.MessageError and "ERROR" or "WARN"
+
+		if #logCache > 0 and logCache[#logCache].Raw == msg then return end
+
+		local fMsg = msg:gsub('"(.-)"', '<font color="#A5D6A7">"%1"</font>')
+		fMsg = fMsg:gsub("(%d+)", '<font color="#90CAF9">%1</font>')
+		local fullText = string.format("<b>[%s]</b> %s", lType, fMsg)
+		if stack ~= "" then 
+			local sStack = stack:gsub("(.-):(%d+)", "<font color='#81C784'>%1</font>:<font color='#FFF176'>%2</font>")
+			fullText = fullText .. "\n<font color='#B0BEC5'><i>" .. sStack .. "</i></font>" 
+		end
+
+		table.insert(logCache, {Raw = msg, RawMsg = msg .. "\n" .. stack})
+		if #logCache > MAX_LOGS then table.remove(logCache, 1) end
+
+		if scroll then
+			
+			if #scroll:GetChildren() > MAX_LOGS + 1 then
+				for _, v in ipairs(scroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() break end end
+			end
+
+			local lblBtn = Instance.new("TextButton")
+			lblBtn.Size = UDim2.new(1, -10, 0, 20); lblBtn.BackgroundTransparency = 1; lblBtn.Text = ""; lblBtn.Parent = scroll
+
+			local lbl = Instance.new("TextLabel", lblBtn)
+			lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.Code; lbl.TextSize = 13
+			lbl.TextColor3 = color; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.TextYAlignment = Enum.TextYAlignment.Top
+			lbl.RichText = true; lbl.TextWrapped = true; lbl.Text = fullText; lbl.Name = "TextLabel"
+
+			local bounds = TextService:GetTextSize(lbl.ContentText, 13, Enum.Font.Code, Vector2.new(scroll.AbsoluteSize.X - 10, 9e9))
+			lblBtn.Size = UDim2.new(1, -10, 0, bounds.Y + 6)
+			
+			lblBtn.MouseButton1Click:Connect(function()
+				if setclipboard then setclipboard(msg .. "\n" .. stack) end
+				lbl.TextColor3 = Color3.fromRGB(100, 255, 100)
+				task.delay(0.3, function() if lbl then lbl.TextColor3 = color end end)
+			end)
+			
+			RefreshLogs()
+			scroll.CanvasPosition = Vector2.new(0, scroll.CanvasSize.Y.Offset)
+		end
 
 		if logType == Enum.MessageType.MessageError then
-			color = Color3.fromRGB(255, 80, 80); prefix = "[ERROR]"
-		elseif logType == Enum.MessageType.MessageWarning then
-			color = Color3.fromRGB(255, 200, 80); prefix = "[WARNING]"
-		end
-
-		local fullText = string.format("<b>%s</b> %s", prefix, msg)
-		if stack and stack ~= "" then fullText = fullText .. "\n<font color='#888899'><i>" .. stack .. "</i></font>" end
-
-		local textLabel = self:Create("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 0),
-			BackgroundTransparency = 1,
-			Text = fullText,
-			Font = Enum.Font.Code,
-			TextColor3 = color,
-			TextSize = 13,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Top,
-			RichText = true, TextWrapped = true,
-			LayoutOrder = logCount, Parent = scroll
-		})
-
-		local bounds = textService:GetTextSize(textLabel.ContentText, 13, Enum.Font.Code, Vector2.new(scroll.AbsoluteSize.X - 15, 9e9))
-		textLabel.Size = UDim2.new(1, -10, 0, bounds.Y + 6)
-		
-		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
-			scroll.CanvasPosition = Vector2.new(0, scroll.CanvasSize.Y.Offset)
-		end)
-
-		if logType == Enum.MessageType.MessageError and not isErrorOnCooldown then
-			isErrorOnCooldown = true
-			self:Notify({
-				Title = "Script Error Detected",
-				Content = msg:sub(1, 80) .. (#msg > 80 and "..." or ""),
-				Type = "error", Duration = 7,
-				Buttons = {
-					{ Title = "Copy Error", Callback = function() if setclipboard then setclipboard(msg .. "\n" .. tostring(stack)) end end },
-					{ Title = "View Console", Callback = function() mainFrame.Visible = true end }
-				}
-			})
-			task.delay(3, function() isErrorOnCooldown = false end)
+			if isMobile and floatBtn and not floatVisible then floatVisible = true; floatBtn.Visible = true end
+			
+			local toast = Instance.new("TextLabel")
+			toast.Size = UDim2.new(0, 260, 0, 32); toast.Position = UDim2.new(1, 0, 1, -120); toast.AnchorPoint = Vector2.new(1, 0)
+			toast.BackgroundColor3 = Color3.fromRGB(220, 30, 30); toast.Text = "Copy"
+			toast.TextColor3 = Color3.fromRGB(255, 255, 255); toast.Font = Enum.Font.GothamBold; toast.TextSize = 12
+			Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", toast).Thickness = 1.5
+			SafeProtect(toast)
+			
+			local sT = TweenService:Create(toast, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(1, -20, 1, -120)})
+			sT:Play()
+			task.delay(5, function()
+				local eT = TweenService:Create(toast, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(1, 300, 1, -120)})
+				eT:Play(); eT.Completed:Connect(function() toast:Destroy() end)
+			end)
 		end
 	end
 
-	clearBtn.MouseButton1Click:Connect(function()
-		for _, v in pairs(scroll:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
-		logCount = 0
-		scroll.CanvasSize = UDim2.new(0,0,0,0)
-	end)
-
-	LogService.MessageOut:Connect(function(msg, msgType)
-		if msgType == Enum.MessageType.MessageError or msgType == Enum.MessageType.MessageWarning then addLog(msg, msgType) end
-	end)
-	ScriptContext.Error:Connect(function(msg, stack) addLog(msg, Enum.MessageType.MessageError, stack) end)
-
-	inputService.InputBegan:Connect(function(input, gp)
-		if not gp and input.KeyCode == toggleKey then mainFrame.Visible = not mainFrame.Visible end
-	end)
-
-	self.ToggleDevConsole = function()
-		mainFrame.Visible = not mainFrame.Visible
-	end
-
-	if showMobileToggle and (inputService.TouchEnabled or true) then 
-		local mContainer = self:Create("Frame", {
-			Size = UDim2.new(0, 40, 0, 40),
-			Position = UDim2.new(0, 20, 0.5, 30), 
-			BackgroundTransparency = 1,
-			Parent = devGui
-		})
+	task.spawn(function()
+		BuildUI()
 		
-		local mBtn = self:Create("TextButton", {
-			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundColor3 = Color3.fromRGB(200, 50, 50),
-			BackgroundTransparency = 0.3,
-			Text = "",
-			ClipsDescendants = true,
-			Parent = mContainer
-		})
-		self:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = mBtn })
-		self:Create("UIStroke", { Color = Color3.fromRGB(255, 100, 100), Thickness = 2, Parent = mBtn })
+		pcall(function()
+			LogService.MessageOut:Connect(function(msg, msgType)
+				if msgType == Enum.MessageType.MessageError or msgType == Enum.MessageType.MessageWarning then processLog(msg, msgType) end
+			end)
+		end)
+		pcall(function()
+			ScriptContext.Error:Connect(function(msg, stack) processLog(msg, Enum.MessageType.MessageError, stack) end)
+		end)
 		
-		self:Create("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.new(0, 20, 0, 20),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://74911985506134", 
-			ImageColor3 = Color3.fromRGB(255, 255, 255),
-			Parent = mBtn
-		})
+		UserInputService.InputBegan:Connect(function(input, gp)
+			if not gp and input.KeyCode == Enum.KeyCode.F9 then 
+				isVisible = not isVisible; if mainFrame then mainFrame.Visible = isVisible end
+			end
+		end)
 
-		local btnDragging, btnDragInput, btnDragStart, btnStartPos, btnHasDragged
-		mBtn.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-				btnDragging = true; btnHasDragged = false
-				btnDragInput = input; btnDragStart = input.Position; btnStartPos = mContainer.Position
-				tweenService:Create(mContainer, TweenInfo.new(0.2), {Size = UDim2.new(0, 36, 0, 36)}):Play()
-			end
-		end)
-		inputService.InputChanged:Connect(function(input)
-			if input == btnDragInput and btnDragging then
-				local delta = input.Position - btnDragStart
-				if delta.Magnitude > 8 then btnHasDragged = true end
-				if btnHasDragged then
-					mContainer.Position = UDim2.new(btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X, btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y)
-				end
-			end
-		end)
-		inputService.InputEnded:Connect(function(input)
-			if input == btnDragInput and btnDragging then
-				btnDragging = false
-				tweenService:Create(mContainer, TweenInfo.new(0.2), {Size = UDim2.new(0, 40, 0, 40)}):Play()
-				if not btnHasDragged then self.ToggleDevConsole() end 
-			end
-		end)
-	end
-end
+		while task.wait(1) do
+			if not consoleGui or not consoleGui.Parent then BuildUI() end
+		end
+	end)
+end)()
 
 wait(1)
 local VirtualUser=game:service'VirtualUser'
