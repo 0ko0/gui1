@@ -4194,6 +4194,244 @@ function library:config(windowOrFolder)
 	})
 end
 
+function library:InitDevConsole(options)
+	options = options or {}
+	local toggleKey = options.ToggleKey or Enum.KeyCode.F9
+	local showMobileToggle = options.ShowMobileToggle ~= false 
+	
+	if self.DevConsoleInited then return end
+	self.DevConsoleInited = true
+
+	local ScriptContext = game:GetService("ScriptContext")
+	local LogService = game:GetService("LogService")
+	local inputService = game:GetService("UserInputService")
+	local textService = game:GetService("TextService")
+	local tweenService = game:GetService("TweenService")
+
+	local devGui = self:Create("ScreenGui", { Name = "DevConsole", ResetOnSpawn = false })
+	pcall(function() ProtectGui(devGui) end)
+
+	local mainFrame = self:Create("Frame", {
+		Size = UDim2.new(0, 500, 0, 320),
+		Position = UDim2.new(0.5, -250, 0.5, -160),
+		BackgroundColor3 = Color3.fromRGB(15, 15, 18),
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		Visible = false,
+		Parent = devGui,
+		Active = true
+	})
+	self:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = mainFrame })
+	self:Create("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1.5, Transparency = 0.3, Parent = mainFrame })
+
+	local topBar = self:Create("Frame", {
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundColor3 = Color3.fromRGB(25, 25, 30),
+		BorderSizePixel = 0,
+		Parent = mainFrame
+	})
+	self:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = topBar })
+	self:Create("Frame", { Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6), BackgroundColor3 = Color3.fromRGB(25, 25, 30), BorderSizePixel = 0, Parent = topBar })
+
+	self:Create("TextLabel", {
+		Size = UDim2.new(1, -100, 1, 0),
+		Position = UDim2.new(0, 12, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "Developer Console (" .. toggleKey.Name .. ")",
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(240, 240, 245),
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = topBar
+	})
+
+	local closeBtn = self:Create("TextButton", {
+		Size = UDim2.new(0, 30, 0, 22),
+		Position = UDim2.new(1, -35, 0, 5),
+		BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+		BackgroundTransparency = 0.8,
+		Text = "X",
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(255, 200, 200),
+		TextSize = 12,
+		AutoButtonColor = false,
+		Parent = topBar
+	})
+	self:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = closeBtn })
+	closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+
+	local clearBtn = self:Create("TextButton", {
+		Size = UDim2.new(0, 60, 0, 22),
+		Position = UDim2.new(1, -100, 0, 5),
+		BackgroundColor3 = Color3.fromRGB(40, 40, 45),
+		Text = "Clear",
+		Font = Enum.Font.GothamMedium,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 12,
+		AutoButtonColor = false,
+		Parent = topBar
+	})
+	self:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = clearBtn })
+
+	local scroll = self:Create("ScrollingFrame", {
+		Size = UDim2.new(1, -10, 1, -42),
+		Position = UDim2.new(0, 5, 0, 37),
+		BackgroundTransparency = 1,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = Color3.fromRGB(110, 150, 255),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		Parent = mainFrame
+	})
+	local layout = self:Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = scroll })
+
+	local dragToggle, dragStart, startPos
+	topBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragToggle = true
+			dragStart = input.Position
+			startPos = mainFrame.Position
+		end
+	end)
+	inputService.InputChanged:Connect(function(input)
+		if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+	inputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragToggle = false
+		end
+	end)
+
+	local logCount = 0
+	local isErrorOnCooldown = false
+
+	local function addLog(msg, logType, stack)
+		logCount = logCount + 1
+		local color = Color3.fromRGB(200, 200, 200)
+		local prefix = "[INFO]"
+
+		if logType == Enum.MessageType.MessageError then
+			color = Color3.fromRGB(255, 80, 80); prefix = "[ERROR]"
+		elseif logType == Enum.MessageType.MessageWarning then
+			color = Color3.fromRGB(255, 200, 80); prefix = "[WARNING]"
+		end
+
+		local fullText = string.format("<b>%s</b> %s", prefix, msg)
+		if stack and stack ~= "" then fullText = fullText .. "\n<font color='#888899'><i>" .. stack .. "</i></font>" end
+
+		local textLabel = self:Create("TextLabel", {
+			Size = UDim2.new(1, -10, 0, 0),
+			BackgroundTransparency = 1,
+			Text = fullText,
+			Font = Enum.Font.Code,
+			TextColor3 = color,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			RichText = true, TextWrapped = true,
+			LayoutOrder = logCount, Parent = scroll
+		})
+
+		local bounds = textService:GetTextSize(textLabel.ContentText, 13, Enum.Font.Code, Vector2.new(scroll.AbsoluteSize.X - 15, 9e9))
+		textLabel.Size = UDim2.new(1, -10, 0, bounds.Y + 6)
+		
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+			scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+			scroll.CanvasPosition = Vector2.new(0, scroll.CanvasSize.Y.Offset)
+		end)
+
+		if logType == Enum.MessageType.MessageError and not isErrorOnCooldown then
+			isErrorOnCooldown = true
+			self:Notify({
+				Title = "Script Error Detected",
+				Content = msg:sub(1, 80) .. (#msg > 80 and "..." or ""),
+				Type = "error", Duration = 7,
+				Buttons = {
+					{ Title = "Copy Error", Callback = function() if setclipboard then setclipboard(msg .. "\n" .. tostring(stack)) end end },
+					{ Title = "View Console", Callback = function() mainFrame.Visible = true end }
+				}
+			})
+			task.delay(3, function() isErrorOnCooldown = false end)
+		end
+	end
+
+	clearBtn.MouseButton1Click:Connect(function()
+		for _, v in pairs(scroll:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
+		logCount = 0
+		scroll.CanvasSize = UDim2.new(0,0,0,0)
+	end)
+
+	LogService.MessageOut:Connect(function(msg, msgType)
+		if msgType == Enum.MessageType.MessageError or msgType == Enum.MessageType.MessageWarning then addLog(msg, msgType) end
+	end)
+	ScriptContext.Error:Connect(function(msg, stack) addLog(msg, Enum.MessageType.MessageError, stack) end)
+
+	inputService.InputBegan:Connect(function(input, gp)
+		if not gp and input.KeyCode == toggleKey then mainFrame.Visible = not mainFrame.Visible end
+	end)
+
+	self.ToggleDevConsole = function()
+		mainFrame.Visible = not mainFrame.Visible
+	end
+
+	if showMobileToggle and (inputService.TouchEnabled or true) then 
+		local mContainer = self:Create("Frame", {
+			Size = UDim2.new(0, 40, 0, 40),
+			Position = UDim2.new(0, 20, 0.5, 30), 
+			BackgroundTransparency = 1,
+			Parent = devGui
+		})
+		
+		local mBtn = self:Create("TextButton", {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(200, 50, 50),
+			BackgroundTransparency = 0.3,
+			Text = "",
+			ClipsDescendants = true,
+			Parent = mContainer
+		})
+		self:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = mBtn })
+		self:Create("UIStroke", { Color = Color3.fromRGB(255, 100, 100), Thickness = 2, Parent = mBtn })
+		
+		self:Create("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(0, 20, 0, 20),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://74911985506134", 
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			Parent = mBtn
+		})
+
+		local btnDragging, btnDragInput, btnDragStart, btnStartPos, btnHasDragged
+		mBtn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				btnDragging = true; btnHasDragged = false
+				btnDragInput = input; btnDragStart = input.Position; btnStartPos = mContainer.Position
+				tweenService:Create(mContainer, TweenInfo.new(0.2), {Size = UDim2.new(0, 36, 0, 36)}):Play()
+			end
+		end)
+		inputService.InputChanged:Connect(function(input)
+			if input == btnDragInput and btnDragging then
+				local delta = input.Position - btnDragStart
+				if delta.Magnitude > 8 then btnHasDragged = true end
+				if btnHasDragged then
+					mContainer.Position = UDim2.new(btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X, btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y)
+				end
+			end
+		end)
+		inputService.InputEnded:Connect(function(input)
+			if input == btnDragInput and btnDragging then
+				btnDragging = false
+				tweenService:Create(mContainer, TweenInfo.new(0.2), {Size = UDim2.new(0, 40, 0, 40)}):Play()
+				if not btnHasDragged then self.ToggleDevConsole() end 
+			end
+		end)
+	end
+end
+
 wait(1)
 local VirtualUser=game:service'VirtualUser'
 game:service('Players').LocalPlayer.Idled:connect(function()
