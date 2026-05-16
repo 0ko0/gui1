@@ -184,66 +184,39 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 		ClipsDescendants = true,
 		Parent = parentTable.main
 	})
-    
-    parentTable.content = library:Create("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 3, 
-        ScrollBarImageColor3 = Color3.fromRGB(150, 150, 160), 
-        ScrollBarImageTransparency = 0.4, 
-        VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
-        ScrollingDirection = Enum.ScrollingDirection.Y,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        ElasticBehavior = Enum.ElasticBehavior.Never, 
-        Parent = contentClip
-    })
-    
-    local layout = library:Create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4), 
-        Parent = parentTable.content
-    })
-    
-    library:Create("UIPadding", {
-        PaddingTop = UDim.new(0, 6),
-        PaddingBottom = UDim.new(0, 12), 
-        Parent = parentTable.content
-    })
-    
-    local isResizing = false
-    local function UpdateUI_Size()
-        if not parentTable.main then return end
-        
-        local contentHeight = layout.AbsoluteContentSize.Y + 18 
-        parentTable.content.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
-                
-        if not parentTable.open then
-            tweenService:Create(parentTable.main, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.new(subHolder and 1 or 0, subHolder and 0 or menuWidth, 0, size)
-            }):Play()
-            return
-        end
-       
-        local currentViewport = workspace.CurrentCamera.ViewportSize.Y
-        local safeMaxHeight = math.min(MAX_MENU_HEIGHT, currentViewport - 60)
-              
-        local targetHeight = math.min(contentHeight + size + 8, safeMaxHeight)
-        
-        if not isResizing then
-            isResizing = true
-            local resizeTween = tweenService:Create(parentTable.main, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.new(subHolder and 1 or 0, subHolder and 0 or menuWidth, 0, targetHeight)
-            })
-            resizeTween:Play()
-            resizeTween.Completed:Connect(function()
-                isResizing = false
-            end)
-        end
-    end
 
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateUI_Size)
-    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateUI_Size) 
+	parentTable.content = library:Create("ScrollingFrame", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 2, 
+		ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120), 
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		Parent = contentClip
+	})
+	
+	local layout = library:Create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2),
+		Parent = parentTable.content
+	})
+	
+	library:Create("UIPadding", {
+		PaddingTop = UDim.new(0, 6),
+		PaddingBottom = UDim.new(0, 6),
+		Parent = parentTable.content
+	})
+	
+	layout.Changed:connect(function()
+		parentTable.content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
+		if parentTable.open then
+			local newWidthScale = subHolder and 1 or 0
+			local newWidthOffset = subHolder and 0 or menuWidth
+			parentTable.main.Size = #parentTable.options > 0 and UDim2.new(newWidthScale, newWidthOffset, 0, targetHeight) or UDim2.new(newWidthScale, newWidthOffset, 0, size)
+		end
+	end)
 
 	local function createRipple(posX, posY)
 		local ripple = library:Create("ImageLabel", {
@@ -321,19 +294,24 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 	end
 	
 	local function toggleTab()
-        parentTable.open = not parentTable.open
-        
-        tweenService:Create(close, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Rotation = parentTable.open and 90 or 0, 
-            ImageColor3 = parentTable.open and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
-        }):Play()
-        
-        bottomHider.BackgroundTransparency = parentTable.open and 0 or 1
-               
-        UpdateUI_Size()
-    end
+		parentTable.open = not parentTable.open
+		
+		tweenService:Create(close, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Rotation = parentTable.open and 90 or 0, 
+			ImageColor3 = parentTable.open and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+		}):Play()
+		
+		bottomHider.BackgroundTransparency = parentTable.open and 0 or 1
+		
+		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
+		local newWidthScale = subHolder and 1 or 0
+		local newWidthOffset = subHolder and 0 or menuWidth
+		local endSize = (#parentTable.options > 0 and parentTable.open) and UDim2.new(newWidthScale, newWidthOffset, 0, targetHeight) or UDim2.new(newWidthScale, newWidthOffset, 0, size)
+		
+		tweenService:Create(parentTable.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = endSize}):Play()
+	end
 
-    closeHolder.MouseButton1Click:Connect(toggleTab)
+	closeHolder.MouseButton1Click:Connect(toggleTab)
 	
 	function parentTable:SetTitle(newTitle)
 		title.Text = tostring(newTitle)
@@ -3138,33 +3116,28 @@ function parent:AddDivider(option)
 end
 
 function library:CreateWindow(options)
-    local isTable = typeof(options) == "table"
-    local titleText = isTable and (options.Title or options.title or "Window") or (typeof(options) == "string" and options or "Window")
-        
-    local viewport = workspace.CurrentCamera.ViewportSize
-    
-    local rawWidth = isTable and (options.Width or options.width or options.Size or 230) or 230
-    local rawMaxHeight = isTable and (options.MaxHeight or options.maxHeight or 400) or 400
+	local isTable = typeof(options) == "table"
+	local titleText = isTable and (options.Title or options.title or "Window") or (typeof(options) == "string" and options or "Window")
+		
+	local windowWidth = isTable and (options.Width or options.width or options.Size or 230) or 230
+	local windowMaxHeight = isTable and (options.MaxHeight or options.maxHeight or 400) or 400
 
-    local windowWidth = math.clamp(tonumber(rawWidth) or 230, 180, viewport.X - 40)
-      
-    local windowMaxHeight = math.clamp(tonumber(rawMaxHeight) or 400, 150, viewport.Y - 40)
+	local window = {
+		title = tostring(titleText), 
+		width = tonumber(windowWidth),
+		maxHeight = tonumber(windowMaxHeight),
+		options = {}, 
+		open = true, 
+		canInit = true, 
+		init = false, 
+		position = #self.windows
+	}
 
-    local window = {
-        title = tostring(titleText), 
-        width = windowWidth,
-        maxHeight = windowMaxHeight,
-        options = {}, 
-        open = true, 
-        canInit = true, 
-        init = false, 
-        position = #self.windows
-    }
-
-    getFnctions(window)
-    table.insert(library.windows, window)
-    
-    return window
+	getFnctions(window)
+	
+	table.insert(library.windows, window)
+	
+	return window
 end
 
 local UIToggle
