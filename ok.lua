@@ -192,7 +192,6 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 		ScrollBarThickness = 2, 
 		ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120), 
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-		AutomaticCanvasSize = Enum.AutomaticSize.Y, 
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		Parent = contentClip
 	})
@@ -205,13 +204,13 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 	
 	library:Create("UIPadding", {
 		PaddingTop = UDim.new(0, 6),
-		PaddingBottom = UDim.new(0, 30), 
+		PaddingBottom = UDim.new(0, 6),
 		Parent = parentTable.content
 	})
 	
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		
-		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 24, MAX_MENU_HEIGHT)
+	layout.Changed:connect(function()
+		parentTable.content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
 		if parentTable.open then
 			local newWidthScale = subHolder and 1 or 0
 			local newWidthOffset = subHolder and 0 or menuWidth
@@ -304,7 +303,7 @@ local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
 		
 		bottomHider.BackgroundTransparency = parentTable.open and 0 or 1
 		
-		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 24, MAX_MENU_HEIGHT)
+		local targetHeight = math.min(layout.AbsoluteContentSize.Y + size + 12, MAX_MENU_HEIGHT)
 		local newWidthScale = subHolder and 1 or 0
 		local newWidthOffset = subHolder and 0 or menuWidth
 		local endSize = (#parentTable.options > 0 and parentTable.open) and UDim2.new(newWidthScale, newWidthOffset, 0, targetHeight) or UDim2.new(newWidthScale, newWidthOffset, 0, size)
