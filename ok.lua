@@ -4003,195 +4003,386 @@ function library:ToggleUI(keybind)
 	end
 end
 
-library.ConfigManager = {
-	Folder = "Skibidi", 
-	Extension = ".json",
-	AutoSaveInterval = 10,
-	IsAutoSaving = false
-}
-
 local HttpService = game:GetService("HttpService")
+local GameID = game.GameId or game.PlaceId
 
-function library.ConfigManager:InitFolder()
-	if not isfolder then return end
-	if not isfolder(self.Folder) then
-		makefolder(self.Folder)
-	end
-	if not isfolder(self.Folder .. "/Configs") then
-		makefolder(self.Folder .. "/Configs")
-	end
+local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function Base64Encode(data)
+    return ((data:gsub('.', function(x) 
+        local r,b='',x:byte() for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end return r; 
+    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x) 
+        if (#x < 6) then return '' end local c=0 for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end return b:sub(c+1,c+1) 
+    end)..({ '', '==', '=' })[#data%3+1])
 end
 
-local function EncodeData()
-	local savedData = {}
-	for flag, element in pairs(library.Registry) do
-		local value = library.flags[flag]
-		if typeof(value) == "Color3" then
-			savedData[flag] = {Type = "Color3", R = value.R, G = value.G, B = value.B, Alpha = element.transparency or 0}
-		elseif typeof(value) == "table" then
-			savedData[flag] = value 
-		elseif typeof(value) ~= "function" and typeof(value) ~= "Instance" and typeof(value) ~= "userdata" then
-			savedData[flag] = value
-		end
-	end
-	return HttpService:JSONEncode(savedData)
+local function Base64Decode(data)
+    data = string.gsub(data, '[^'..b..'=]', '')
+    return (data:gsub('.', function(x) 
+        if (x == '=') then return '' end local r,f='',(b:find(x)-1) for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end return r; 
+    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x) 
+        if (#x ~= 8) then return '' end local c=0 for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end return string.char(c) 
+    end))
+end
+
+library.ConfigManager = {
+    Folder = "Skibidi", 
+    Extension = ".skbd",
+    AutoSaveInterval = 10,
+    IsAutoSaving = false
+}
+
+function library.ConfigManager:GetPath()
+    return self.Folder .. "/Configs/" .. tostring(GameID)
+end
+
+function library.ConfigManager:InitFolder()
+    if not isfolder then return end
+    
+    if not isfolder(self.Folder) then makefolder(self.Folder) end
+    if not isfolder(self.Folder .. "/Configs") then makefolder(self.Folder .. "/Configs") end
+    
+    local gameFolder = self:GetPath()
+    if not isfolder(gameFolder) then makefolder(gameFolder) end
+end
+
+local function BuildPayload()
+    local savedData = {
+        Metadata = {
+            Game = game.Name or "Unknown",
+            GameID = GameID,
+            SavedAt = os.date("%Y-%m-%d %H:%M:%S"),
+            Author = game:GetService("Players").LocalPlayer.Name
+        },
+        Settings = {}
+    }
+    
+    for flag, element in pairs(library.Registry) do
+        local value = library.flags[flag]
+        if typeof(value) == "Color3" then
+            savedData.Settings[flag] = {Type = "Color3", R = value.R, G = value.G, B = value.B, Alpha = element.transparency or 0}
+        elseif typeof(value) == "EnumItem" then
+            savedData.Settings[flag] = {Type = "Enum", Name = value.Name}
+        elseif typeof(value) == "table" then
+            savedData.Settings[flag] = value 
+        elseif typeof(value) ~= "function" and typeof(value) ~= "Instance" and typeof(value) ~= "userdata" then
+            savedData.Settings[flag] = value
+        end
+    end
+    
+    return savedData
 end
 
 function library.ConfigManager:Save(fileName)
-	if not writefile then return library:Notify({Title = "error", Content = "Your executor does not support file saving", Type = "error"}) end
-	self:InitFolder()
-	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
-	local success, err = pcall(function()
-		writefile(path, EncodeData())
-	end)
-	if success then
-		library:Notify({Title = "success", Content = "Configuration saved: " .. fileName, Type = "success", Duration = 3})
-	else
-		library:Notify({Title = "error", Content = "Failed to save configuration: " .. tostring(err), Type = "error"})
-	end
+    if not writefile then return library:Notify({Title = "Error", Content = "Your executor does not support saving files.", Type = "error"}) end
+    self:InitFolder()
+    
+    local path = self:GetPath() .. "/" .. fileName .. self.Extension
+    local payload = BuildPayload()
+    
+    local jsonStr = HttpService:JSONEncode(payload)
+    local encryptedStr = Base64Encode(jsonStr) 
+    
+    if isfile(path) then
+        pcall(function() writefile(path .. ".bak", readfile(path)) end)
+    end
+    
+    local success, err = pcall(function() writefile(path, encryptedStr) end)
+    
+    if success then
+        library:Notify({Title = "Config Saved", Content = "Successfully saved: " .. fileName, Type = "success", Duration = 3})
+    else
+        library:Notify({Title = "Save Failed", Content = tostring(err), Type = "error"})
+    end
+end
+
+function library.ConfigManager:LoadData(encryptedStr)
+    local success, decodedJSON = pcall(function() return Base64Decode(encryptedStr) end)
+    if not success or not decodedJSON or decodedJSON == "" then return false end
+
+    local successJSON, data = pcall(function() return HttpService:JSONDecode(decodedJSON) end)
+    if not successJSON or type(data) ~= "table" or not data.Settings then return false end
+
+    for flag, value in pairs(data.Settings) do
+        local element = library.Registry[flag]
+        if element then
+            pcall(function()
+                if type(value) == "table" and value.Type == "Color3" then
+                    element:SetColor(Color3.new(value.R, value.G, value.B), value.Alpha)
+                else
+                    if element.type == "toggle" then element:SetState(value)
+                    elseif element.type == "slider" then element:SetValue(value)
+                    elseif element.type == "box" then element:SetValue(value)
+                    elseif element.type == "list" then element:SetValue(value)
+                    elseif element.type == "bind" then element:SetKey(value)
+                    end
+                end
+            end)
+        end
+    end
+    return true
 end
 
 function library.ConfigManager:Load(fileName)
-	if not readfile then return end
-	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
-	if isfile(path) then
-		local success, decoded = pcall(function()
-			return HttpService:JSONDecode(readfile(path))
-		end)
-		
-		if success and type(decoded) == "table" then
-			for flag, value in pairs(decoded) do
-				local element = library.Registry[flag]
-				if element then
-					if type(value) == "table" and value.Type == "Color3" then
-						local color = Color3.new(value.R, value.G, value.B)
-						element:SetColor(color, value.Alpha)
-					else
-						
-						if element.type == "toggle" then element:SetState(value)
-						elseif element.type == "slider" then element:SetValue(value)
-						elseif element.type == "box" then element:SetValue(value)
-						elseif element.type == "list" then element:SetValue(value)
-						elseif element.type == "bind" then element:SetKey(value)
-						end
-					end
-				end
-			end
-			library:Notify({Title = "success", Content = "Configuration loaded: " .. fileName, Type = "success", Duration = 3})
-		else
-			library:Notify({Title = "error", Content = "The config file is corrupted", Type = "error"})
-		end
-	else
-		library:Notify({Title = "error", Content = "Config not found: " .. fileName, Type = "error"})
-	end
+    if not readfile then return end
+    local path = self:GetPath() .. "/" .. fileName .. self.Extension
+    
+    if isfile(path) then
+        local fileData = readfile(path)
+        local loaded = self:LoadData(fileData)
+        
+        if loaded then
+            library:Notify({Title = "Config Loaded", Content = "Successfully loaded: " .. fileName, Type = "success", Duration = 3})
+        else
+            
+            if isfile(path .. ".bak") then
+                library:Notify({Title = "Warning", Content = "File corrupted. Attempting to load backup...", Type = "warning"})
+                local bakLoaded = self:LoadData(readfile(path .. ".bak"))
+                if bakLoaded then
+                    library:Notify({Title = "Backup Loaded", Content = "Restored from backup.", Type = "success"})
+                else
+                    library:Notify({Title = "Error", Content = "Both config and backup are corrupted.", Type = "error"})
+                end
+            else
+                library:Notify({Title = "Error", Content = "Config file is corrupted.", Type = "error"})
+            end
+        end
+    else
+        library:Notify({Title = "Error", Content = "Config not found: " .. fileName, Type = "error"})
+    end
 end
 
 function library.ConfigManager:Delete(fileName)
-	if not delfile then return end
-	local path = self.Folder .. "/Configs/" .. fileName .. self.Extension
-	if isfile(path) then
-		delfile(path)
-		library:Notify({Title = "success", Content = "Configuration deleted: " .. fileName, Type = "info"})
-	end
+    if not delfile then return end
+    local path = self:GetPath() .. "/" .. fileName .. self.Extension
+    if isfile(path) then delfile(path) end
+    if isfile(path .. ".bak") then delfile(path .. ".bak") end
+    library:Notify({Title = "Config Deleted", Content = "Deleted: " .. fileName, Type = "info"})
 end
 
 function library.ConfigManager:GetConfigs()
-	local list = {}
-	if not isfolder or not listfiles then return list end
-	self:InitFolder()
-	for _, file in ipairs(listfiles(self.Folder .. "/Configs")) do
-		local fileName = file:match("([^/\\]+)$")
-		if fileName and fileName:find(self.Extension) then
-			
-			table.insert(list, (fileName:gsub(self.Extension, "")))
-		end
-	end
-	return list
+    local list = {}
+    if not isfolder or not listfiles then return list end
+    self:InitFolder()
+    
+    local path = self:GetPath()
+    pcall(function()
+        for _, file in ipairs(listfiles(path)) do
+            local fileName = file:match("([^/\\]+)$")
+            if fileName and fileName:find(self.Extension) and not fileName:find("%.bak$") then
+                table.insert(list, (fileName:gsub(self.Extension, "")))
+            end
+        end
+    end)
+    return list
+end
+
+function library.ConfigManager:Export()
+    local payload = BuildPayload()
+    local jsonStr = HttpService:JSONEncode(payload)
+    local encryptedStr = "SKIBIDI-" .. Base64Encode(jsonStr) 
+    
+    pcall(function()
+        if setclipboard then setclipboard(encryptedStr)
+        elseif toClipboard then toClipboard(encryptedStr) end
+    end)
+    
+    library:Notify({Title = "Exported", Content = "Config copied to clipboard!", Type = "success"})
+end
+
+function library.ConfigManager:Import(importStr)
+    if not importStr or not importStr:match("^SKIBIDI%-") then
+        return library:Notify({Title = "Import Failed", Content = "Invalid config string format.", Type = "error"})
+    end
+    
+    local realData = importStr:gsub("^SKIBIDI%-", "")
+    local loaded = self:LoadData(realData)
+    
+    if loaded then
+        library:Notify({Title = "Imported", Content = "Config successfully imported!", Type = "success"})
+    else
+        library:Notify({Title = "Import Failed", Content = "The config string is corrupted.", Type = "error"})
+    end
+end
+
+-- Lấy đường dẫn file chứa tên config cần auto-load
+function library.ConfigManager:GetAutoLoadPath()
+    return self:GetPath() .. "/autoload.txt"
+end
+
+-- Cài đặt hoặc Xóa Auto-Load
+function library.ConfigManager:SetAutoLoad(configName)
+    if not writefile then return end
+    self:InitFolder()
+    
+    local path = self:GetAutoLoadPath()
+    
+    if configName and configName ~= "" then
+        writefile(path, configName)
+        library:Notify({Title = "Auto-Load Set", Content = "Will auto-load: " .. configName, Type = "success"})
+    else
+        if isfile(path) then
+            delfile(path)
+        end
+        library:Notify({Title = "Auto-Load Cleared", Content = "Auto-load has been disabled.", Type = "info"})
+    end
+end
+
+function library.ConfigManager:AutoLoad()
+    local path = self:GetAutoLoadPath()
+    if isfile(path) then
+        local configToLoad = readfile(path)
+        if configToLoad and configToLoad ~= "" then
+            library:Notify({Title = "Auto-Loading", Content = "Loading default config...", Type = "info", Duration = 2})
+            task.wait(0.5) 
+            self:Load(configToLoad)
+        end
+    end
 end
 
 function library:config(windowOrFolder)
-	
-	windowOrFolder = windowOrFolder or self.windows[1] 
-	if not windowOrFolder then
-		warn("[Library] Error: Please create a window before calling the config function")
-		return
-	end
+    windowOrFolder = windowOrFolder or self.windows[1] 
+    if not windowOrFolder then
+        warn("[Library] Error: Please create a window before calling the config function")
+        return
+    end
 
-	library.ConfigManager:InitFolder()
-	local ConfigInput = ""
-	local ConfigDropdown
-	
-	windowOrFolder:AddDivider("Configuration")
-	
-	windowOrFolder:AddBox({
-		text = "Config Name",
-		placeholder = "Enter name here...",
-		callback = function(val) ConfigInput = val end
-	})
-	
-	ConfigDropdown = windowOrFolder:AddList({
-		text = "Saved Configs",
-		values = library.ConfigManager:GetConfigs(),
-		callback = function(val) ConfigInput = val end
-	})
-	
-	windowOrFolder:AddButton({
-		text = "Save Config",
-		color = Color3.fromRGB(80, 255, 140),
-		callback = function()
-			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please enter the config name", Type = "warning"}) end
-			library.ConfigManager:Save(ConfigInput)
-			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
-			ConfigDropdown:SetValue(ConfigInput)
-		end
-	})
-	
-	windowOrFolder:AddButton({
-		text = "Load Config",
-		color = Color3.fromRGB(110, 150, 255),
-		callback = function()
-			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please select a config to load", Type = "warning"}) end
-			library.ConfigManager:Load(ConfigInput)
-		end
-	})
-	
-	windowOrFolder:AddButton({
-		text = "Delete Config",
-		color = Color3.fromRGB(255, 80, 80),
-		callback = function()
-			if ConfigInput == "" then return library:Notify({Title = "error", Content = "Please select a config to delete", Type = "warning"}) end
-			library.ConfigManager:Delete(ConfigInput)
-			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
-			ConfigDropdown:SetValue("")
-		end
-	})
-	
-	windowOrFolder:AddButton({
-		text = "Refresh List",
-		callback = function()
-			ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
-		end
-	})
-	
-	windowOrFolder:AddDivider("Auto Save")
-	
-	windowOrFolder:AddToggle({
-		text = "Auto Save Config",
-		flag = "Config_AutoSave",
-		callback = function(state)
-			library.ConfigManager.IsAutoSaving = state
-			if state then
-				task.spawn(function()
-					while library.ConfigManager.IsAutoSaving do
-						task.wait(library.ConfigManager.AutoSaveInterval)
-						if ConfigInput ~= "" then
-							library.ConfigManager:Save(ConfigInput)
-						end
-					end
-				end)
-			end
-		end
-	})
+    library.ConfigManager:InitFolder()
+    local ConfigInput = ""
+    local ConfigDropdown
+    
+    windowOrFolder:AddDivider("File Manager")
+    
+    windowOrFolder:AddBox({
+        text = "Config Name",
+        placeholder = "...",
+        clearOnFocus = false,
+        callback = function(val) ConfigInput = val end
+    })
+    
+    ConfigDropdown = windowOrFolder:AddList({
+        text = "Saved Configs",
+        values = library.ConfigManager:GetConfigs(),
+        callback = function(val) ConfigInput = val end
+    })
+    
+    windowOrFolder:AddButton({
+        text = "Save Config",
+        color = Color3.fromRGB(80, 255, 140),
+        callback = function()
+            if ConfigInput == "" then return library:Notify({Title = "Warning", Content = "Please enter a config name.", Type = "warning"}) end
+            library.ConfigManager:Save(ConfigInput)
+            ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+            ConfigDropdown:SetValue(ConfigInput)
+        end
+    })
+    
+    windowOrFolder:AddButton({
+        text = "Load Config",
+        color = Color3.fromRGB(110, 150, 255),
+        callback = function()
+            if ConfigInput == "" then return library:Notify({Title = "Warning", Content = "Please select a config to load.", Type = "warning"}) end
+            library.ConfigManager:Load(ConfigInput)
+        end
+    })
+    
+    windowOrFolder:AddButton({
+        text = "Delete Config",
+        color = Color3.fromRGB(255, 80, 80),
+        callback = function()
+            if ConfigInput == "" then return library:Notify({Title = "Warning", Content = "Please select a config to delete.", Type = "warning"}) end
+            library.ConfigManager:Delete(ConfigInput)
+            ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+            ConfigDropdown:SetValue("")
+        end
+    })
+    
+    windowOrFolder:AddButton({
+        text = "Refresh List",
+        callback = function()
+            ConfigDropdown:Refresh(library.ConfigManager:GetConfigs())
+        end
+    })
+    
+    windowOrFolder:AddDivider("Cloud / Share")
+    
+    windowOrFolder:AddButton({
+        text = "Export to Clipboard",
+        color = Color3.fromRGB(255, 200, 80),
+        callback = function()
+            library.ConfigManager:Export()
+        end
+    })
+
+    windowOrFolder:AddButton({
+        text = "Import from Clipboard",
+        color = Color3.fromRGB(200, 100, 255),
+        callback = function()
+            
+            local clipboardData = ""
+            pcall(function()
+                if getclipboard then clipboardData = getclipboard() end
+            end)
+            
+            if clipboardData ~= "" then
+                library.ConfigManager:Import(clipboardData)
+            else
+                library:Notify({Title = "Error", Content = "Your clipboard is empty or executor doesn't support getclipboard().", Type = "error"})
+            end
+        end
+    })
+
+    windowOrFolder:AddDivider("Auto Load")
+    
+    local currentAutoLoad = "None"
+    pcall(function()
+        local autoPath = library.ConfigManager:GetAutoLoadPath()
+        if isfile(autoPath) then currentAutoLoad = readfile(autoPath) end
+    end)
+    
+    local autoLoadLabel = windowOrFolder:AddLabel({
+        text = "Current Auto-Load: <font color='#50FF8C'>" .. currentAutoLoad .. "</font>"
+    })
+
+    windowOrFolder:AddButton({
+        text = "Set Selected as Auto-Load",
+        color = Color3.fromRGB(100, 255, 200),
+        callback = function()
+            if ConfigInput == "" then 
+                return library:Notify({Title = "Warning", Content = "Please select a config first!", Type = "warning"}) 
+            end
+            library.ConfigManager:SetAutoLoad(ConfigInput)
+            autoLoadLabel:SetText("Current Auto-Load: <font color='#50FF8C'>" .. ConfigInput .. "</font>")
+        end
+    })
+
+    windowOrFolder:AddButton({
+        text = "Clear Auto-Load",
+        color = Color3.fromRGB(200, 100, 100),
+        callback = function()
+            library.ConfigManager:SetAutoLoad("")
+            autoLoadLabel:SetText("Current Auto-Load: <font color='#FF5050'>None</font>")
+        end
+    })
+
+    windowOrFolder:AddDivider("Settings")
+    
+    windowOrFolder:AddToggle({
+        text = "Auto Save Config",
+        flag = "Config_AutoSave",
+        callback = function(state)
+            library.ConfigManager.IsAutoSaving = state
+            if state then
+                task.spawn(function()
+                    while library.ConfigManager.IsAutoSaving do
+                        task.wait(library.ConfigManager.AutoSaveInterval)
+                        if ConfigInput ~= "" then
+                            library.ConfigManager:Save(ConfigInput)
+                        end
+                    end
+                end)
+            end
+        end
+    })
 end
 
 wait(1)
